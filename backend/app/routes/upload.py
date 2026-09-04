@@ -18,12 +18,15 @@ import os
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
+from app.models.database import get_db
 from app.schemas.transaction import DataSourceType, UploadSummary
 from app.services.parser import build_upload_summary, parse_file
 from app.services.normalizer import normalise_with_trace
 from app.services.data_quality import run_quality_checks
+from app.services.db_service import save_upload
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +69,11 @@ async def upload_file(
         default=True,
         description="Whether to run Data Quality checks after normalisation",
     ),
+    db: Session = Depends(get_db),
 ) -> UploadSummary:
     """
     Full ingestion pipeline:
-      Parse → Normalise → Quality Check → Return Summary
+      Parse → Normalise → Quality Check → Save to DB → Return Summary
     """
     # ── 1. Validate file extension ────────────────────────────────────────────
     _validate_extension(file.filename or "")
@@ -122,8 +126,8 @@ async def upload_file(
         quality_report.quality_score if quality_report else "N/A",
     )
 
-    # ── 6. Build & return summary ─────────────────────────────────────────────
-    return build_upload_summary(
+    # ── 6. Build summary ───────────────────────────────────────────────────────────────────
+    summary = build_upload_summary(
         filename=file.filename or "upload",
         source=source,
         result=result,
@@ -132,3 +136,11 @@ async def upload_file(
         quality_report=quality_report,
         normalization_traces=traces,
     )
+
+    # ── 7. Persist to DB (non-fatal if XAMPP is not running) ─────────────────────
+    try:
+        save_upload(db, summary)
+    except Exception as exc:
+        logger.warning("DB save skipped: %s", exc)
+
+    return summary

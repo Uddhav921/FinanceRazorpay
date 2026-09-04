@@ -86,3 +86,6 @@ export async function runReconciliation(orderFile, pspFile, bankFile, tolerance 
   return res.json()
 }
 
+// ─── AI Narrative Report (Steps 7 & 8) ────────────────────────────────────────
+export const generateAIReport = () => request('POST', '/report/generate')
+export const getLatestAIReport = () => request('GET', '/report/latest')

@@ -1,0 +1,184 @@
+-- ============================================================
+--  AI Finance Controller — MySQL Schema
+--  Run in XAMPP phpMyAdmin (http://localhost/phpmyadmin)
+--  Database: finance_controller
+-- ============================================================
+
+CREATE DATABASE IF NOT EXISTS finance_controller
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE finance_controller;
+
+-- ──────────────────────────────────────────────────────────────
+-- 1. upload_sessions
+--    One row per file uploaded (Order/PSP/Bank)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS upload_sessions (
+  id              INT UNSIGNED     AUTO_INCREMENT PRIMARY KEY,
+  filename        VARCHAR(255)     NOT NULL,
+  source          ENUM('order_ledger','razorpay_psp','bank_statement') NOT NULL,
+  total_rows      INT UNSIGNED     DEFAULT 0,
+  valid_rows      INT UNSIGNED     DEFAULT 0,
+  skipped_rows    INT UNSIGNED     DEFAULT 0,
+  normalised_count INT UNSIGNED    DEFAULT 0,
+  quality_score   DECIMAL(5,2)     DEFAULT 100.00,
+  uploaded_at     DATETIME         DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_source (source),
+  INDEX idx_uploaded_at (uploaded_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ──────────────────────────────────────────────────────────────
+-- 2. transactions
+--    Every normalised transaction row from any source
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS transactions (
+  id              BIGINT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  session_id      INT UNSIGNED     NOT NULL,          -- FK → upload_sessions.id
+  source          ENUM('order_ledger','razorpay_psp','bank_statement') NOT NULL,
+  transaction_id  VARCHAR(128)     DEFAULT NULL,
+  order_id        VARCHAR(128)     DEFAULT NULL,
+  settlement_id   VARCHAR(128)     DEFAULT NULL,
+  merchant_id     VARCHAR(128)     DEFAULT NULL,
+  txn_date        DATE             DEFAULT NULL,
+  gross_amount    DECIMAL(15,2)    NOT NULL DEFAULT 0.00,
+  fee_amount      DECIMAL(15,2)    NOT NULL DEFAULT 0.00,
+  tax_amount      DECIMAL(15,2)    NOT NULL DEFAULT 0.00,
+  tds_amount      DECIMAL(15,2)    NOT NULL DEFAULT 0.00,
+  refund_amount   DECIMAL(15,2)    NOT NULL DEFAULT 0.00,
+  net_amount      DECIMAL(15,2)    NOT NULL DEFAULT 0.00,
+  reference       VARCHAR(255)     DEFAULT NULL,
+  status          VARCHAR(32)      DEFAULT 'unknown',
+  currency        CHAR(3)          DEFAULT 'INR',
+  raw_row_index   INT UNSIGNED     DEFAULT NULL,
+  created_at      DATETIME         DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_txn_session FOREIGN KEY (session_id)
+    REFERENCES upload_sessions(id) ON DELETE CASCADE,
+  INDEX idx_txn_id     (transaction_id),
+  INDEX idx_order_id   (order_id),
+  INDEX idx_settlement (settlement_id),
+  INDEX idx_source     (source),
+  INDEX idx_date       (txn_date),
+  INDEX idx_session    (session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ──────────────────────────────────────────────────────────────
+-- 3. reconciliation_runs
+--    One row per POST /reconciliation/run call
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reconciliation_runs (
+  id                  INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  order_session_id    INT UNSIGNED  DEFAULT NULL,   -- FK → upload_sessions
+  psp_session_id      INT UNSIGNED  DEFAULT NULL,
+  bank_session_id     INT UNSIGNED  DEFAULT NULL,
+  total_order         INT UNSIGNED  DEFAULT 0,
+  total_psp           INT UNSIGNED  DEFAULT 0,
+  total_bank          INT UNSIGNED  DEFAULT 0,
+  total_matched       INT UNSIGNED  DEFAULT 0,
+  total_reconciled    INT UNSIGNED  DEFAULT 0,
+  total_exceptions    INT UNSIGNED  DEFAULT 0,
+  match_rate          DECIMAL(5,2)  DEFAULT 0.00,
+  reconciliation_rate DECIMAL(5,2)  DEFAULT 0.00,
+  total_expected_net  DECIMAL(15,2) DEFAULT 0.00,
+  total_actual_bank   DECIMAL(15,2) DEFAULT 0.00,
+  total_difference    DECIMAL(15,2) DEFAULT 0.00,
+  tolerance_pct       DECIMAL(5,2)  DEFAULT 0.50,
+  run_at              DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_run_order FOREIGN KEY (order_session_id)
+    REFERENCES upload_sessions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_run_psp   FOREIGN KEY (psp_session_id)
+    REFERENCES upload_sessions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_run_bank  FOREIGN KEY (bank_session_id)
+    REFERENCES upload_sessions(id) ON DELETE SET NULL,
+  INDEX idx_run_at (run_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ──────────────────────────────────────────────────────────────
+-- 4. reconciliation_results
+--    One row per transaction in a reconciliation run
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reconciliation_results (
+  id              BIGINT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  run_id          INT UNSIGNED     NOT NULL,          -- FK → reconciliation_runs.id
+  order_txn_id    BIGINT UNSIGNED  DEFAULT NULL,      -- FK → transactions.id
+  psp_txn_id      BIGINT UNSIGNED  DEFAULT NULL,
+  bank_txn_id     BIGINT UNSIGNED  DEFAULT NULL,
+  confidence      TINYINT UNSIGNED DEFAULT 0,         -- 0–100
+  match_strategy  VARCHAR(64)      DEFAULT '',
+  status          ENUM('reconciled','exception','pending') NOT NULL DEFAULT 'pending',
+  reason_code     VARCHAR(32)      DEFAULT NULL,
+  reason_detail   TEXT             DEFAULT NULL,
+  date_diff_days  SMALLINT         DEFAULT NULL,
+  created_at      DATETIME         DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_result_run    FOREIGN KEY (run_id)
+    REFERENCES reconciliation_runs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_result_order  FOREIGN KEY (order_txn_id)
+    REFERENCES transactions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_result_psp    FOREIGN KEY (psp_txn_id)
+    REFERENCES transactions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_result_bank   FOREIGN KEY (bank_txn_id)
+    REFERENCES transactions(id) ON DELETE SET NULL,
+  INDEX idx_run_id  (run_id),
+  INDEX idx_status  (status),
+  INDEX idx_reason  (reason_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ──────────────────────────────────────────────────────────────
+-- 5. settlement_breakdowns
+--    One row per reconciliation_result (settlement calculation)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS settlement_breakdowns (
+  id                  BIGINT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+  result_id           BIGINT UNSIGNED  NOT NULL,   -- FK → reconciliation_results.id
+  gross_amount        DECIMAL(15,2)    DEFAULT 0.00,
+  fee_amount          DECIMAL(15,2)    DEFAULT 0.00,
+  tax_amount          DECIMAL(15,2)    DEFAULT 0.00,
+  tds_amount          DECIMAL(15,2)    DEFAULT 0.00,
+  refund_amount       DECIMAL(15,2)    DEFAULT 0.00,
+  other_adjustments   DECIMAL(15,2)    DEFAULT 0.00,
+  expected_net        DECIMAL(15,2)    DEFAULT 0.00,
+  actual_bank_credit  DECIMAL(15,2)    DEFAULT 0.00,
+  difference          DECIMAL(15,2)    DEFAULT 0.00,  -- Signed: Bank − Expected
+  CONSTRAINT fk_breakdown_result FOREIGN KEY (result_id)
+    REFERENCES reconciliation_results(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_result (result_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ──────────────────────────────────────────────────────────────
+-- Useful views
+-- ──────────────────────────────────────────────────────────────
+
+-- Latest reconciliation summary
+CREATE OR REPLACE VIEW v_latest_run AS
+SELECT
+  r.id, r.run_at,
+  r.total_matched, r.total_reconciled, r.total_exceptions,
+  r.match_rate, r.reconciliation_rate,
+  r.total_expected_net, r.total_actual_bank, r.total_difference,
+  r.tolerance_pct
+FROM reconciliation_runs r
+ORDER BY r.run_at DESC
+LIMIT 1;
+
+-- Exception rows with settlement detail
+CREATE OR REPLACE VIEW v_exceptions AS
+SELECT
+  rr.id          AS result_id,
+  rr.run_id,
+  rr.status,
+  rr.reason_code,
+  rr.reason_detail,
+  rr.confidence,
+  rr.match_strategy,
+  sb.gross_amount,
+  sb.expected_net,
+  sb.actual_bank_credit,
+  sb.difference,
+  pt.transaction_id AS psp_txn_id,
+  bt.transaction_id AS bank_txn_id
+FROM reconciliation_results rr
+LEFT JOIN settlement_breakdowns  sb ON sb.result_id  = rr.id
+LEFT JOIN transactions           pt ON pt.id         = rr.psp_txn_id
+LEFT JOIN transactions           bt ON bt.id         = rr.bank_txn_id
+WHERE rr.status = 'exception'
+ORDER BY rr.run_id DESC, ABS(sb.difference) DESC;

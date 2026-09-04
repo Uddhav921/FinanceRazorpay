@@ -3,6 +3,7 @@ import FileUpload from './components/FileUpload'
 import UploadResults from './components/UploadResults'
 import SchemaMap from './components/SchemaMap'
 import Reconciliation from './components/Reconciliation'
+import AIReport from './components/AIReport'
 import { checkHealth } from './services/api'
 
 /* ── Nav icons ────────────────────────────────────────────────────────────── */
@@ -86,7 +87,7 @@ export default function App() {
     { key: 'schema',    label: 'Schema Map',       icon: icons.schema },
     { key: 'dashboard', label: 'Dashboard',        icon: icons.dashboard },
     { key: 'reconcile', label: 'Reconciliation',   icon: icons.reconcile },
-    { key: 'anomalies', label: 'Anomalies',         icon: icons.anomaly },
+    { key: 'anomalies', label: 'AI Insights',      icon: icons.anomaly },
   ]
 
   return (
@@ -158,11 +159,14 @@ export default function App() {
           {/* ── Reconciliation page ── */}
           {page === 'reconcile' && <Reconciliation />}
 
+          {/* ── AI Report page (Steps 7 & 8) ── */}
+          {page === 'anomalies' && <AIReport />}
+
           {/* ── Schema Map page ── */}
           {page === 'schema' && <SchemaMap />}
 
           {/* ── Placeholder pages ── */}
-          {page !== 'upload' && page !== 'schema' && page !== 'reconcile' && (
+          {page !== 'upload' && page !== 'schema' && page !== 'reconcile' && page !== 'anomalies' && (
             <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚧</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Coming Soon</h2>

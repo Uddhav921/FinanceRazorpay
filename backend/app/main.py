@@ -26,10 +26,26 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
-    logger.info("🚀  AI Finance Controller backend starting up...")
-    # Future: create DB tables here via SQLAlchemy
+    logger.info("\U0001f680  AI Finance Controller backend starting up...")
+
+    # Create all DB tables (safe — does nothing if tables already exist)
+    try:
+        from app.models.database import engine
+        from app.models import orm        # ensure ORM classes are registered
+        from app.models.orm import (
+            UploadSession, Transaction,
+            ReconciliationRun, ReconciliationResult, SettlementBreakdown,
+        )
+        from sqlalchemy import inspect as sa_inspect
+        from app.models.database import Base
+        Base.metadata.create_all(bind=engine)
+        tables = sa_inspect(engine).get_table_names()
+        logger.info("DB tables ready: %s", tables)
+    except Exception as exc:
+        logger.warning("DB init skipped (check XAMPP is running): %s", exc)
+
     yield
-    logger.info("🛑  Backend shutting down.")
+    logger.info("\U0001f6d1  Backend shutting down.")
 
 
 # ─── App ──────────────────────────────────────────────────────────────────────
@@ -55,16 +71,13 @@ app.add_middleware(
 )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
-from app.routes import upload, schema, reconciliation   # noqa: E402
+from app.routes import upload, schema, reconciliation, anomaly, report   # noqa: E402
 
 app.include_router(upload.router)
 app.include_router(schema.router)
 app.include_router(reconciliation.router)
-
-# Placeholder routers — will be wired up in subsequent modules
-# app.include_router(reconciliation.router)
-# app.include_router(anomalies.router)
-# app.include_router(reports.router)
+app.include_router(anomaly.router)
+app.include_router(report.router)
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────────
