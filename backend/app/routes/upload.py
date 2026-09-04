@@ -1,12 +1,17 @@
 """
 upload.py — /upload route (Data Sources ingestion endpoint)
 
-Accepts CSV / XLSX files for the three data sources:
+Full Ingestion Layer pipeline:
+  1. Validate file extension + size
+  2. Parse (CSV / XLSX → TransactionBase list)
+  3. Normalise  (clean IDs, coerce amounts, derive net, apply source rules)
+  4. Data Quality Checks (duplicates, missing fields, format errors)
+  5. Return UploadSummary (parse stats + quality report + transactions)
+
+Accepted data sources:
   • order_ledger
   • razorpay_psp
   • bank_statement
-
-Returns a structured summary of parsed transactions plus any row-level errors.
 """
 
 import os
@@ -17,6 +22,8 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.schemas.transaction import DataSourceType, UploadSummary
 from app.services.parser import build_upload_summary, parse_file
+from app.services.normalizer import normalise
+from app.services.data_quality import run_quality_checks
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +51,8 @@ def _validate_extension(filename: str) -> None:
     description=(
         "Upload a CSV or XLSX file for one of the three data sources: "
         "`order_ledger`, `razorpay_psp`, or `bank_statement`. "
-        "The file is parsed and normalised into the standardised transaction schema."
+        "The file is parsed, normalised, and run through Data Quality checks. "
+        "Returns a structured summary with parse stats, quality report, and transactions."
     ),
 )
 async def upload_file(
@@ -54,15 +62,19 @@ async def upload_file(
         default=True,
         description="Whether to include parsed transactions in the response",
     ),
+    run_quality: bool = Form(
+        default=True,
+        description="Whether to run Data Quality checks after normalisation",
+    ),
 ) -> UploadSummary:
     """
-    Parse and normalise an uploaded data source file.
-    Returns a summary of parsed rows plus any row-level errors.
+    Full ingestion pipeline:
+      Parse → Normalise → Quality Check → Return Summary
     """
-    # ── Validate file extension ──────────────────────────────────────────────
+    # ── 1. Validate file extension ────────────────────────────────────────────
     _validate_extension(file.filename or "")
 
-    # ── Read bytes ──────────────────────────────────────────────────────────
+    # ── 2. Read bytes ─────────────────────────────────────────────────────────
     file_bytes = await file.read()
 
     if len(file_bytes) == 0:
@@ -77,9 +89,12 @@ async def upload_file(
             detail=f"File size exceeds the {os.getenv('MAX_FILE_SIZE_MB', '50')} MB limit.",
         )
 
-    logger.info("Received upload: '%s' | source=%s | size=%d bytes", file.filename, source, len(file_bytes))
+    logger.info(
+        "Received upload: '%s' | source=%s | size=%d bytes",
+        file.filename, source, len(file_bytes),
+    )
 
-    # ── Parse ────────────────────────────────────────────────────────────────
+    # ── 3. Parse ──────────────────────────────────────────────────────────────
     result = parse_file(
         file_bytes=file_bytes,
         filename=file.filename or "upload",
@@ -92,9 +107,27 @@ async def upload_file(
             detail={"message": "Failed to parse any rows.", "errors": result.errors},
         )
 
+    # ── 4. Normalise ──────────────────────────────────────────────────────────
+    normalised = normalise(result.transactions)
+    result.transactions = normalised
+    normalised_count = len(normalised)
+
+    # ── 5. Data Quality Checks ────────────────────────────────────────────────
+    quality_report = run_quality_checks(normalised) if run_quality else None
+
+    logger.info(
+        "Ingestion complete: '%s' | normalised=%d | quality_score=%s%%",
+        file.filename,
+        normalised_count,
+        quality_report.quality_score if quality_report else "N/A",
+    )
+
+    # ── 6. Build & return summary ─────────────────────────────────────────────
     return build_upload_summary(
         filename=file.filename or "upload",
         source=source,
         result=result,
         include_transactions=include_transactions,
+        normalised_count=normalised_count,
+        quality_report=quality_report,
     )

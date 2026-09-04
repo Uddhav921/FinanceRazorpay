@@ -30,6 +30,7 @@ import pandas as pd
 
 from app.schemas.transaction import (
     DataSourceType,
+    QualityReport,
     TransactionBase,
     TransactionStatus,
     UploadSummary,
@@ -294,15 +295,19 @@ def build_upload_summary(
     source: DataSourceType,
     result: ParseResult,
     include_transactions: bool = True,
+    normalised_count: int = 0,
+    quality_report: QualityReport | None = None,
 ) -> UploadSummary:
-    """Wrap a ParseResult into the API response schema."""
+    """Wrap a ParseResult (+ optional normalisation & quality data) into the API response schema."""
     total = len(result.transactions) + result.skipped
     return UploadSummary(
-        filename     = filename,
-        source       = source,
-        total_rows   = total,
-        valid_rows   = len(result.transactions),
-        skipped_rows = result.skipped,
-        parse_errors = result.errors,
-        transactions = result.transactions if include_transactions else [],
+        filename         = filename,
+        source           = source,
+        total_rows       = total,
+        valid_rows       = len(result.transactions),
+        skipped_rows     = result.skipped,
+        normalised_count = normalised_count,
+        parse_errors     = result.errors,
+        quality_report   = quality_report,
+        transactions     = result.transactions if include_transactions else [],
     )

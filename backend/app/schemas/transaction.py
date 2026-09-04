@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date as Date
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -88,14 +88,38 @@ class TransactionRead(TransactionBase):
     model_config = {"from_attributes": True}
 
 
+# ─── Data Quality Schemas ─────────────────────────────────────────────────────
+
+class QualityFlag(BaseModel):
+    """A single data-quality issue found on one row."""
+    row_index  : int
+    issue_type : str          # duplicate | missing_field | format_error
+    severity   : str          # error | warning
+    field      : Optional[str] = None
+    message    : str
+
+
+class QualityReport(BaseModel):
+    """Aggregated quality report for one uploaded file."""
+    total_rows          : int            = 0
+    duplicate_count     : int            = 0
+    missing_field_count : int            = 0
+    format_error_count  : int            = 0
+    warning_count       : int            = 0
+    quality_score       : float          = 100.0   # 0–100
+    flagged_rows        : List[QualityFlag] = Field(default_factory=list)
+
+
 # ─── Upload Response Schema ────────────────────────────────────────────────────
 
 class UploadSummary(BaseModel):
-    """Returned after a successful file upload & parse."""
-    filename        : str
-    source          : DataSourceType
-    total_rows      : int
-    valid_rows      : int
-    skipped_rows    : int
-    parse_errors    : list[str] = []
-    transactions    : list[TransactionBase] = []
+    """Returned after a successful file upload, parse, normalise & quality check."""
+    filename         : str
+    source           : DataSourceType
+    total_rows       : int
+    valid_rows       : int
+    skipped_rows     : int
+    normalised_count : int                   = 0
+    parse_errors     : list[str]             = []
+    quality_report   : Optional[QualityReport] = None
+    transactions     : list[TransactionBase] = []

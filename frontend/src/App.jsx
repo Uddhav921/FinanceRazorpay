@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import FileUpload from './components/FileUpload'
 import UploadResults from './components/UploadResults'
 import { checkHealth } from './services/api'
@@ -50,8 +50,9 @@ export default function App() {
   const [backendStatus, setBackendStatus] = useState('checking') // 'ok' | 'error' | 'checking'
   const [toasts, setToasts] = useState([])
 
+  const toastCounter = useRef(0)
   const addToast = (msg, type = 'success') => {
-    const id = Date.now()
+    const id = ++toastCounter.current
     setToasts(p => [...p, { id, msg, type }])
     setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000)
   }
