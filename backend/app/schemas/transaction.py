@@ -161,3 +161,70 @@ class MatchReport(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
+
+# ─── Settlement Calculation Schemas ───────────────────────────────────────────
+
+class SettlementBreakdown(BaseModel):
+    """Per-transaction settlement calculation breakdown."""
+    gross_amount       : Decimal = Decimal("0.00")
+    fee_amount         : Decimal = Decimal("0.00")
+    tax_amount         : Decimal = Decimal("0.00")
+    tds_amount         : Decimal = Decimal("0.00")
+    refund_amount      : Decimal = Decimal("0.00")
+    other_adjustments  : Decimal = Decimal("0.00")
+    expected_net       : Decimal = Decimal("0.00")
+    # Actual from bank (for comparison)
+    actual_bank_credit : Decimal = Decimal("0.00")
+    difference         : Decimal = Decimal("0.00")   # |expected_net − actual_bank_credit|
+
+
+# ─── Reconciliation Engine Schemas ────────────────────────────────────────────
+
+class ReconciliationStatus(str, Enum):
+    """Per-transaction reconciliation outcome."""
+    RECONCILED = "reconciled"
+    EXCEPTION  = "exception"
+    PENDING    = "pending"
+
+
+class ReconciliationResult(BaseModel):
+    """Full reconciliation result for one matched (or unmatched) transaction."""
+    # Source transactions
+    order_txn   : Optional[TransactionBase] = None
+    psp_txn     : Optional[TransactionBase] = None
+    bank_txn    : Optional[TransactionBase] = None
+    # Matching metadata
+    confidence      : int     = 0
+    match_strategy  : str     = ""
+    # Settlement breakdown
+    settlement      : SettlementBreakdown = Field(default_factory=SettlementBreakdown)
+    # Reconciliation outcome
+    status          : ReconciliationStatus = ReconciliationStatus.PENDING
+    reason_code     : Optional[str]        = None   # e.g. AMOUNT_MISMATCH, MISSING_BANK
+    reason_detail   : Optional[str]        = None   # Human-readable explanation
+    date_diff_days  : Optional[int]        = None
+
+
+class ReconciliationReport(BaseModel):
+    """Full output of one reconciliation run (matching + settlement + comparison)."""
+    # Counts
+    total_order         : int = 0
+    total_psp           : int = 0
+    total_bank          : int = 0
+    total_matched       : int = 0
+    total_reconciled    : int = 0
+    total_exceptions    : int = 0
+    # Rates
+    match_rate          : float   = 0.0
+    reconciliation_rate : float   = 0.0
+    # Amounts
+    total_expected_net  : Decimal = Decimal("0.00")
+    total_actual_bank   : Decimal = Decimal("0.00")
+    total_difference    : Decimal = Decimal("0.00")
+    tolerance_pct       : Decimal = Decimal("0.5")
+    # Results
+    results             : List[ReconciliationResult] = Field(default_factory=list)
+    exceptions          : List[ReconciliationResult] = Field(default_factory=list)
+    run_at              : datetime = Field(default_factory=datetime.utcnow)
+
+    model_config = {"arbitrary_types_allowed": True}

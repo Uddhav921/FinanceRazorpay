@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { runReconciliation } from '../services/api'
 
 /* ── Config ──────────────────────────────────────────────────────────────── */
@@ -218,92 +218,241 @@ export default function Reconciliation() {
       {/* ── Results ── */}
       {report && (
         <>
-          {/* Summary strip */}
+          {/* ── KPI strip ── */}
           <div className="recon-stat-strip">
-            <StatCard label="Order Rows"    value={report.total_order} color="#6366f1" />
-            <StatCard label="PSP Rows"      value={report.total_psp}   color="#22d3a5" />
-            <StatCard label="Bank Rows"     value={report.total_bank}  color="#f59e0b" />
-            <StatCard label="Matched"       value={report.matched.length} color="var(--clr-success)" />
-            <StatCard label="Match Rate"    value={`${report.match_rate}%`}
-              sub={`${report.matched.length} / ${Math.max(report.total_order, report.total_psp, report.total_bank)}`}
-              color={report.match_rate >= 80 ? 'var(--clr-success)' : report.match_rate >= 50 ? 'var(--clr-warning)' : 'var(--clr-danger)'} />
-            <StatCard label="Reconciled"    value={`${report.reconciled_rate}%`}
-              sub={`tol ${report.tolerance}%`}
-              color={report.reconciled_rate >= 80 ? 'var(--clr-success)' : 'var(--clr-warning)'} />
+            <StatCard
+              label="Total Transactions"
+              value={Math.max(report.total_order, report.total_psp, report.total_bank)}
+              color="var(--clr-text)"
+            />
+            <StatCard
+              label="Successfully Linked"
+              value={report.total_matched}
+              sub={`of ${Math.max(report.total_order, report.total_psp, report.total_bank)}`}
+              color="var(--clr-success)"
+            />
+            <StatCard
+              label="Match Rate"
+              value={`${report.match_rate}%`}
+              color={report.match_rate >= 80 ? 'var(--clr-success)' : report.match_rate >= 50 ? 'var(--clr-warning)' : 'var(--clr-danger)'}
+            />
+            <StatCard
+              label="Reconciled"
+              value={report.total_reconciled}
+              sub={`of ${report.total_matched} linked`}
+              color="var(--clr-success)"
+            />
+            <StatCard
+              label="Reconciliation Rate"
+              value={`${report.reconciliation_rate}%`}
+              sub={`tol ±${report.tolerance_pct}%`}
+              color={report.reconciliation_rate >= 80 ? 'var(--clr-success)' : report.reconciliation_rate >= 50 ? 'var(--clr-warning)' : 'var(--clr-danger)'}
+            />
+            <StatCard
+              label="Exceptions"
+              value={report.total_exceptions}
+              color={report.total_exceptions === 0 ? 'var(--clr-success)' : 'var(--clr-danger)'}
+            />
           </div>
 
-          {/* Matched table */}
-          {report.matched.length > 0 && (
-            <div className="card" style={{ marginBottom: '1.25rem' }}>
-              <h3 style={{ marginBottom: '0.85rem' }}>
-                Matched Transactions
-                <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--clr-muted)', marginLeft: '0.5rem' }}>
-                  ({report.matched.length} matches)
-                </span>
-              </h3>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Confidence</th>
-                      <th>Strategy</th>
-                      <th>Reconciled</th>
-                      <th>Order TXN ID</th>
-                      <th>PSP TXN ID</th>
-                      <th>PSP Net</th>
-                      <th>Bank Net</th>
-                      <th>Δ Amount</th>
-                      <th>Δ Days</th>
-                      <th>Date (PSP)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.matched.map((m, i) => (
-                      <tr key={i} className={m.is_reconciled ? 'match-reconciled' : 'match-exception'}>
-                        <td><ConfBadge score={m.confidence} /></td>
-                        <td><StrategyChip strategy={m.match_strategy} /></td>
-                        <td>
-                          {m.is_reconciled
-                            ? <span style={{ color: 'var(--clr-success)', fontWeight: 600 }}>✓ Yes</span>
-                            : <span style={{ color: 'var(--clr-danger)' }}>✗ No</span>}
-                        </td>
-                        <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                          {m.order_txn?.transaction_id ?? '—'}
-                        </td>
-                        <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                          {m.psp_txn?.transaction_id ?? '—'}
-                        </td>
-                        <td>₹{Number(m.psp_txn?.net_amount ?? 0).toFixed(2)}</td>
-                        <td>₹{Number(m.bank_txn?.net_amount ?? 0).toFixed(2)}</td>
-                        <td style={{ color: Number(m.amount_diff) > 0 ? 'var(--clr-warning)' : 'var(--clr-success)' }}>
-                          ₹{Number(m.amount_diff).toFixed(2)}
-                        </td>
-                        <td style={{ color: 'var(--clr-muted)' }}>
-                          {m.date_diff_days != null ? `${m.date_diff_days}d` : '—'}
-                        </td>
-                        <td>{m.psp_txn?.date ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          {/* ── Secondary amounts row ── */}
+          <div className="recon-stat-strip" style={{ marginBottom: '1.25rem' }}>
+            <StatCard label="Expected Net"  value={`₹${Number(report.total_expected_net).toFixed(2)}`} />
+            <StatCard label="Bank Credit"   value={`₹${Number(report.total_actual_bank).toFixed(2)}`} />
+            <StatCard
+              label="Net Difference (Bank − Expected)"
+              value={`${Number(report.total_difference) >= 0 ? '+' : ''}₹${Number(report.total_difference).toFixed(2)}`}
+              color={Number(report.total_difference) >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)'}
+            />
+          </div>
+
+          {/* ── Results table ── */}
+          {report.results?.length > 0 && (
+            <ReconResultsTable results={report.results} />
           )}
 
-          {/* Unmatched panels */}
-          <div className="card">
-            <h3 style={{ marginBottom: '1rem' }}>Unmatched Transactions</h3>
-            <UnmatchedPanel label="Order / Ledger" icon="📋" color="#6366f1" txns={report.unmatched_order} />
-            <UnmatchedPanel label="Razorpay / PSP" icon="💳" color="#22d3a5" txns={report.unmatched_psp} />
-            <UnmatchedPanel label="Bank Statement" icon="🏦" color="#f59e0b" txns={report.unmatched_bank} />
-            {!report.unmatched_order?.length && !report.unmatched_psp?.length && !report.unmatched_bank?.length && (
-              <p style={{ color: 'var(--clr-success)', fontSize: '0.85rem' }}>
-                ✅ All transactions matched — no unmatched rows.
-              </p>
-            )}
-          </div>
+          {/* ── Exceptions panel ── */}
+          {report.exceptions?.length > 0 && (
+            <ExceptionsPanel exceptions={report.exceptions} />
+          )}
+
+          {/* ── Unmatched panels ── */}
+          <UnmatchedSummary report={report} />
         </>
       )}
+    </div>
+  )
+}
+
+/* ── Results table ──────────────────────────────────────────────────── */
+function ReconResultsTable({ results }) {
+  const [expanded, setExpanded] = useState(null)
+  return (
+    <div className="card" style={{ marginBottom: '1.25rem' }}>
+      <h3 style={{ marginBottom: '0.85rem' }}>
+        All Transactions
+        <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--clr-muted)', marginLeft: '0.5rem' }}>
+          ({results.length} results)
+        </span>
+      </h3>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Status</th>
+              <th>Confidence</th>
+              <th>Strategy</th>
+              <th>PSP TXN ID</th>
+              <th>Gross</th>
+              <th>Expected Net</th>
+              <th>Bank Credit</th>
+              <th>Bank−Expected</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r, i) => (
+              <React.Fragment key={i}>
+                <tr
+                  className={r.status === 'reconciled' ? 'match-reconciled' : 'match-exception'}
+                  onClick={() => setExpanded(expanded === i ? null : i)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td style={{ color: 'var(--clr-muted)', width: 24 }}>
+                    <span style={{ fontSize: '0.7rem' }}>{expanded === i ? '▼' : '▶'}</span>
+                  </td>
+                  <td>
+                    {r.status === 'reconciled'
+                      ? <span className="recon-status-ok">✓ Reconciled</span>
+                      : <span className="recon-status-err">✗ Exception</span>}
+                  </td>
+                  <td><ConfBadge score={r.confidence} /></td>
+                  <td><StrategyChip strategy={r.match_strategy} /></td>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                    {r.psp_txn?.transaction_id ?? '—'}
+                  </td>
+                  <td>₹{Number(r.settlement?.gross_amount ?? 0).toFixed(2)}</td>
+                  <td style={{ color: 'var(--clr-success)', fontWeight: 600 }}>
+                    ₹{Number(r.settlement?.expected_net ?? 0).toFixed(2)}
+                  </td>
+                  <td style={{ color: '#60a5fa' }}>
+                    ₹{Number(r.settlement?.actual_bank_credit ?? 0).toFixed(2)}
+                  </td>
+                  <td style={{ color: Number(r.settlement?.difference ?? 0) >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)', fontWeight: 600 }}>
+                    {Number(r.settlement?.difference ?? 0) >= 0 ? '+' : ''}₹{Number(r.settlement?.difference ?? 0).toFixed(2)}
+                  </td>
+                  <td style={{ fontSize: '0.75rem', color: 'var(--clr-muted)' }}>
+                    {r.reason_code
+                      ? <span className="reason-chip">{r.reason_code}</span>
+                      : '—'}
+                  </td>
+                </tr>
+                {expanded === i && (
+                  <tr key={`${i}-detail`}>
+                    <td colSpan={10} style={{ padding: 0 }}>
+                      <SettlementBreakdownRow r={r} />
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ── Settlement breakdown expanded row ──────────────────────────── */
+function SettlementBreakdownRow({ r }) {
+  const s = r.settlement || {}
+  return (
+    <div className="settlement-breakdown">
+      <div className="settlement-formula">
+        <span className="sf-item gross">Gross<br/><strong>₹{Number(s.gross_amount ?? 0).toFixed(2)}</strong></span>
+        <span className="sf-op">−</span>
+        <span className="sf-item">Fee<br/><strong>₹{Number(s.fee_amount ?? 0).toFixed(2)}</strong></span>
+        <span className="sf-op">−</span>
+        <span className="sf-item">Tax/GST<br/><strong>₹{Number(s.tax_amount ?? 0).toFixed(2)}</strong></span>
+        <span className="sf-op">−</span>
+        <span className="sf-item">TDS<br/><strong>₹{Number(s.tds_amount ?? 0).toFixed(2)}</strong></span>
+        <span className="sf-op">−</span>
+        <span className="sf-item">Refund<br/><strong>₹{Number(s.refund_amount ?? 0).toFixed(2)}</strong></span>
+        {Number(s.other_adjustments ?? 0) > 0 && <>
+          <span className="sf-op">−</span>
+          <span className="sf-item">Adjustments<br/><strong>₹{Number(s.other_adjustments).toFixed(2)}</strong></span>
+        </>}
+        <span className="sf-op">=</span>
+        <span className="sf-item expected">Expected Net<br/><strong>₹{Number(s.expected_net ?? 0).toFixed(2)}</strong></span>
+        <span className="sf-op">vs</span>
+        <span className="sf-item bank">Bank Credit<br/><strong>₹{Number(s.actual_bank_credit ?? 0).toFixed(2)}</strong></span>
+      </div>
+      {r.reason_detail && (
+        <div className="settlement-reason">
+          <span style={{ color: 'var(--clr-warning)', marginRight: '0.4rem' }}>⚠</span>
+          {r.reason_detail}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Exceptions panel ─────────────────────────────────────────────── */
+function ExceptionsPanel({ exceptions }) {
+  return (
+    <div className="card exception-card" style={{ marginBottom: '1.25rem' }}>
+      <h3 style={{ marginBottom: '1rem', color: 'var(--clr-danger)' }}>
+        ⚠ Exceptions
+        <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--clr-muted)', marginLeft: '0.5rem' }}>
+          ({exceptions.length} rows need attention)
+        </span>
+      </h3>
+      {exceptions.map((r, i) => (
+        <div key={i} className="exception-row">
+          <div className="exception-header">
+            <span className="reason-chip danger">{r.reason_code}</span>
+            <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--clr-muted)' }}>
+              {r.psp_txn?.transaction_id || r.bank_txn?.transaction_id || `Row ${i + 1}`}
+            </span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--clr-danger)' }}>
+              Diff: ₹{Number(r.settlement?.difference ?? 0).toFixed(2)}
+            </span>
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--clr-muted)', margin: '0.4rem 0 0' }}>
+            {r.reason_detail}
+          </p>
+          <SettlementBreakdownRow r={r} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ── Unmatched summary ─────────────────────────────────────────────── */
+function UnmatchedSummary({ report }) {
+  const unmatchedPsp  = report.exceptions?.filter(r => r.reason_code === 'MISSING_BANK')  || []
+  const unmatchedBank = report.exceptions?.filter(r => r.reason_code === 'MISSING_PSP')   || []
+  const unmatchedOrder = report.results?.filter(r => r.reason_code === 'MISSING_ORDER')   || []
+
+  if (!unmatchedPsp.length && !unmatchedBank.length && !unmatchedOrder.length) {
+    return (
+      <div className="card">
+        <p style={{ color: 'var(--clr-success)', fontSize: '0.85rem' }}>
+          ✅ All transactions matched — no unmatched rows.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="card">
+      <h3 style={{ marginBottom: '1rem' }}>Unmatched Transactions</h3>
+      <UnmatchedPanel label="Razorpay / PSP (no bank match)" icon="💳" color="#22d3a5"
+        txns={unmatchedPsp.map(r => r.psp_txn).filter(Boolean)} />
+      <UnmatchedPanel label="Bank (no PSP match)" icon="🏦" color="#f59e0b"
+        txns={unmatchedBank.map(r => r.bank_txn).filter(Boolean)} />
+      <UnmatchedPanel label="No Order Record" icon="📋" color="#6366f1"
+        txns={unmatchedOrder.map(r => r.psp_txn).filter(Boolean)} />
     </div>
   )
 }

@@ -815,3 +815,112 @@ tbody td { padding: 0.7rem 1rem; color: var(--clr-text); white-space: nowrap; }
   color: var(--clr-muted);
   padding-left: 0.2rem;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   RECONCILIATION STATUS & EXCEPTIONS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Status badges ── */
+.recon-status-ok {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--clr-success);
+  background: rgba(34,211,165,0.1);
+  border: 1px solid rgba(34,211,165,0.25);
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+}
+.recon-status-err {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--clr-danger);
+  background: rgba(244,63,94,0.1);
+  border: 1px solid rgba(244,63,94,0.25);
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+}
+
+/* ── Reason code chips ── */
+.reason-chip {
+  display: inline-block;
+  font-size: 0.68rem; font-weight: 700;
+  font-family: monospace;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(245,158,11,0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.25);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.reason-chip.danger {
+  background: rgba(244,63,94,0.12);
+  color: #fb7185;
+  border-color: rgba(244,63,94,0.25);
+}
+
+/* ── Exception card ── */
+.exception-card {
+  border-color: rgba(244,63,94,0.2) !important;
+  background: rgba(244,63,94,0.02) !important;
+}
+.exception-row {
+  padding: 0.85rem;
+  border: 1px solid rgba(244,63,94,0.15);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.6rem;
+}
+.exception-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ── Settlement formula row ── */
+.settlement-breakdown {
+  background: var(--clr-bg);
+  border-top: 1px solid var(--clr-border);
+  padding: 1rem 1.25rem;
+}
+.settlement-formula {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.75rem;
+}
+.sf-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.68rem;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  gap: 0.2rem;
+}
+.sf-item strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  font-family: monospace;
+}
+.sf-item.gross strong  { color: var(--clr-primary-h); }
+.sf-item.expected strong { color: var(--clr-success); }
+.sf-item.bank strong   { color: #60a5fa; }
+.sf-op {
+  font-size: 1rem;
+  color: var(--clr-muted);
+  padding-bottom: 0.25rem;
+  font-weight: 600;
+}
+.settlement-reason {
+  font-size: 0.8rem;
+  color: var(--clr-muted);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--clr-border);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
