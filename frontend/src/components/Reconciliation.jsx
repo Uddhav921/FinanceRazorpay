@@ -1,11 +1,46 @@
 import React, { useState, useRef } from 'react'
 import { runReconciliation } from '../services/api'
 
-/* ── Config ──────────────────────────────────────────────────────────────── */
 const SOURCES = [
-  { key: 'order',  label: 'Order / Ledger',  icon: '📋', color: '#6366f1', form: 'order_file' },
-  { key: 'psp',    label: 'Razorpay / PSP',  icon: '💳', color: '#22d3a5', form: 'psp_file' },
-  { key: 'bank',   label: 'Bank Statement',  icon: '🏦', color: '#f59e0b', form: 'bank_file' },
+  {
+    key: 'order',
+    label: 'Order / Ledger',
+    desc: 'Internal ERP orders, invoices, adjustments',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+        <rect x="9" y="3" width="6" height="4" rx="1"/>
+        <path d="M9 12h6M9 16h4"/>
+      </svg>
+    ),
+    color: '#6366f1',
+    form: 'order_file',
+  },
+  {
+    key: 'psp',
+    label: 'Razorpay / PSP',
+    desc: 'Settlement report with fees, taxes, TDS',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="2" y="5" width="20" height="14" rx="2"/>
+        <path d="M2 10h20"/>
+      </svg>
+    ),
+    color: '#22d3a5',
+    form: 'psp_file',
+  },
+  {
+    key: 'bank',
+    label: 'Bank Statement',
+    desc: 'Bank credits, debits, UTR references',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/>
+      </svg>
+    ),
+    color: '#f59e0b',
+    form: 'bank_file',
+  },
 ]
 
 const STRATEGY_LABEL = {
@@ -93,15 +128,21 @@ function UnmatchedPanel({ label, icon, color, txns }) {
 }
 
 /* ── Main component ───────────────────────────────────────────────────────── */
-export default function Reconciliation({ onNavigate }) {
+export default function Reconciliation({ onNavigate, onReconciliationComplete, externalReport }) {
   const [files, setFiles] = useState({ order: null, psp: null, bank: null })
   const [dragging, setDragging] = useState(null)
   const [loading, setLoading] = useState(false)
   const [tolerance, setTolerance] = useState('0.5')
   const [dateWindow, setDateWindow] = useState('2')
-  const [report, setReport] = useState(null)
+  const [report, setReport] = useState(externalReport || null)
   const [error, setError] = useState(null)
   const inputRefs = useRef({})
+
+  React.useEffect(() => {
+    if (externalReport) {
+      setReport(externalReport)
+    }
+  }, [externalReport])
 
   const handleFile = (key, file) => file && setFiles(p => ({ ...p, [key]: file }))
   const selectedCount = SOURCES.filter(s => files[s.key]).length
@@ -115,6 +156,9 @@ export default function Reconciliation({ onNavigate }) {
         parseFloat(tolerance), parseInt(dateWindow)
       )
       setReport(data)
+      if (onReconciliationComplete) {
+        onReconciliationComplete(data)
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -150,10 +194,25 @@ export default function Reconciliation({ onNavigate }) {
                 />
                 <div className="upload-icon" style={{ color: src.color }}>{src.icon}</div>
                 <h3>{src.label}</h3>
-                {file
-                  ? <div className="file-name">📄 {file.name} ({(file.size/1024).toFixed(1)} KB)</div>
-                  : <span style={{ fontSize: '0.78rem', color: 'var(--clr-muted)' }}>Drop or click to browse</span>
-                }
+                <p>{src.desc}</p>
+                {file ? (
+                  <div className="file-name">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6, verticalAlign: 'middle' }}>
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    {file.name} ({(file.size/1024).toFixed(1)} KB)
+                  </div>
+                ) : (
+                  <span className="browse-prompt">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.8 }}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    Drop or click to browse
+                  </span>
+                )}
               </div>
             )
           })}
@@ -182,7 +241,7 @@ export default function Reconciliation({ onNavigate }) {
                 className={`file-dot ${files[s.key] ? 'selected' : ''}`}
                 title={files[s.key] ? `${s.label}: ${files[s.key].name}` : `${s.label}: not uploaded`}
               >
-                {s.icon}
+                <span className="dot-mini-icon">{s.icon}</span>
               </span>
             ))}
             <span className="files-count">{selectedCount}/3</span>
@@ -195,10 +254,18 @@ export default function Reconciliation({ onNavigate }) {
             title={!allSelected ? `Please upload all 3 files (${selectedCount}/3 selected)` : 'Run 3-Way Matching'}
             style={{ marginLeft: 'auto' }}
           >
-            {loading
-              ? <><span className="spinner" /> Running…</>
-              : <>⚡ Run 3-Way Matching</>
-            }
+            {loading ? (
+              <>
+                <span className="spinner" /> Running…
+              </>
+            ) : (
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+                Run 3-Way Matching
+              </>
+            )}
           </button>
           {Object.values(files).some(Boolean) && !loading && (
             <button className="btn btn-ghost"
@@ -330,8 +397,8 @@ function ReconResultsTable({ results }) {
                   </td>
                   <td>
                     {r.status === 'reconciled'
-                      ? <span className="recon-status-ok">✓ Reconciled</span>
-                      : <span className="recon-status-err">✗ Exception</span>}
+                      ? <span className="recon-status-ok">Reconciled</span>
+                      : <span className="recon-status-err">Exception</span>}
                   </td>
                   <td><ConfBadge score={r.confidence} /></td>
                   <td><StrategyChip strategy={r.match_strategy} /></td>
@@ -441,7 +508,12 @@ function ExceptionsPanel({ exceptions, onNavigate }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
           <h3 style={{ margin: 0, color: 'var(--clr-danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span>⚠ Exceptions Flagged</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>Exceptions Flagged</span>
             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f87171', background: 'rgba(239, 68, 68, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}>
               {exceptions.length} rows need attention
             </span>

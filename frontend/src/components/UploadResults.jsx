@@ -16,9 +16,26 @@ const STATUS_BADGE = {
 }
 
 const ISSUE_ICONS = {
-  duplicate:     '🔁',
-  missing_field: '⚠️',
-  format_error:  '🔴',
+  duplicate: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle' }}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  ),
+  missing_field: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle' }}>
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  ),
+  format_error: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle' }}>
+      <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+      <line x1="15" y1="9" x2="9" y2="15"/>
+      <line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+  ),
 }
 
 /* ── Quality Score Badge ────────────────────────────────────────────────── */
@@ -80,22 +97,45 @@ function QualityReportSection({ report }) {
       {/* Metric cards */}
       <div className="quality-metrics">
         <div className="quality-metric-card duplicate">
-          <div className="qm-icon">🔁</div>
+          <div className="qm-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </div>
           <div className="qm-value">{report.duplicate_count}</div>
           <div className="qm-label">Duplicates</div>
         </div>
         <div className="quality-metric-card missing">
-          <div className="qm-icon">📋</div>
+          <div className="qm-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
           <div className="qm-value">{report.missing_field_count}</div>
           <div className="qm-label">Missing Fields</div>
         </div>
         <div className="quality-metric-card format">
-          <div className="qm-icon">🔴</div>
+          <div className="qm-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+          </div>
           <div className="qm-value">{report.format_error_count}</div>
           <div className="qm-label">Format Errors</div>
         </div>
         <div className="quality-metric-card warning">
-          <div className="qm-icon">⚠️</div>
+          <div className="qm-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
           <div className="qm-value">{report.warning_count}</div>
           <div className="qm-label">Warnings</div>
         </div>
@@ -172,7 +212,10 @@ function QualityReportSection({ report }) {
 
       {report.flagged_rows.length === 0 && (
         <div className="quality-clean">
-          ✅ No issues found — all rows passed quality checks.
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--clr-success)' }}>
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          No issues found — all rows passed quality checks.
         </div>
       )}
     </div>
@@ -185,7 +228,7 @@ export default function UploadResults({ results }) {
 
   return (
     <div className="result-section">
-      <h2>Upload Results</h2>
+      <h2>Ingestion & Quality Audit Details</h2>
 
       {results.map((r, i) => (
         <div key={i} className="card" style={{ marginBottom: '1.25rem' }}>
@@ -194,7 +237,7 @@ export default function UploadResults({ results }) {
             <h3>{SOURCE_LABEL[r.source] || r.source} — {r.filename}</h3>
             {r.error
               ? <span className="badge badge-danger">Error</span>
-              : <span className="badge badge-success">✓ Parsed</span>}
+              : <span className="badge badge-success">Parsed & Normalized</span>}
           </div>
 
           {/* Error state */}

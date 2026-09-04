@@ -40,7 +40,7 @@ class NarrativeReport:
     markdown        : str
     summary         : str
     management_note : str
-    model_used      : str = "gemini-3.6-flash"
+    model_used      : str = "AI FinOps Reasoning Engine"
     tokens_used     : int = 0
 
 
@@ -147,7 +147,8 @@ Rules:
 - Use ₹ for currency amounts (Indian Rupees).
 - Be specific — use exact numbers from the data.
 - Do not invent data. Only use what is in the JSON.
-- Keep the tone professional and factual.
+- Keep the tone professional, authoritative, and factual.
+- NEVER use or mention AI model brand names such as Gemini, Google AI, OpenAI, LLM, or ChatGPT. Refer to yourself only as FinCtrl's Autonomous Financial Reasoning Engine.
 """
 
 
@@ -273,7 +274,7 @@ def generate_narrative(
             markdown        = markdown,
             summary         = exec_summary or markdown[:500],
             management_note = mgmt_note or "",
-            model_used      = _MODEL,
+            model_used      = "AI FinOps Reasoning Engine",
             tokens_used     = tokens,
         )
     except Exception as exc:

@@ -298,14 +298,20 @@ export default function ExceptionWorkspace({ onNavigate, initialSelectedId }) {
 
   if (error) return (
     <div className="card" style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
-      <h3 style={{ marginBottom: '0.5rem', color: 'var(--clr-text)' }}>No Reconciliation Run Found</h3>
+      <div style={{ marginBottom: '1rem', color: 'var(--clr-primary)' }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <h3 style={{ marginBottom: '0.5rem', color: 'var(--clr-text)' }}>No Active Reconciliation Run Found</h3>
       <p style={{ color: 'var(--clr-muted)', fontSize: '0.875rem', maxWidth: 460, margin: '0 auto 1.5rem' }}>
-        Exceptions are generated during 3-way matching. Upload your Order, PSP, and Bank statement files in Reconciliation, run matching, and your exceptions will appear here automatically.
+        Exceptions are generated during 3-way matching. Ingest source files and execute matching to review discrepancies here.
       </p>
       {onNavigate && (
         <button className="btn btn-primary" onClick={() => onNavigate('reconcile')}>
-          ⚡ Go to Reconciliation
+          Execute 3-Way Reconciliation →
         </button>
       )}
     </div>
@@ -352,7 +358,7 @@ export default function ExceptionWorkspace({ onNavigate, initialSelectedId }) {
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {exceptions.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--clr-muted)' }}>
-              {filter === 'ALL' ? 'No exceptions in this run 🎉' : `No ${filter} exceptions.`}
+              {filter === 'ALL' ? 'No exceptions in this run.' : `No ${filter} exceptions.`}
             </div>
           ) : exceptions.map(exc => (
             <div
@@ -377,8 +383,12 @@ export default function ExceptionWorkspace({ onNavigate, initialSelectedId }) {
                 <DiffBadge diff={exc.settlement?.difference} />
               </div>
               {exc.assigned_to && (
-                <div style={{ fontSize: '0.72rem', color: 'var(--clr-success)', marginTop: '0.25rem' }}>
-                  👤 {exc.assigned_to}
+                <div style={{ fontSize: '0.72rem', color: 'var(--clr-success)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <span>{exc.assigned_to}</span>
                 </div>
               )}
             </div>

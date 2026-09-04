@@ -25,12 +25,27 @@ from sqlalchemy.orm import relationship
 from app.models.database import Base
 
 
+# ── 0. users ────────────────────────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    email      = Column(String(255), unique=True, nullable=False, index=True)
+    name       = Column(String(255), nullable=False)
+    avatar_url = Column(String(512), nullable=True)
+    google_id  = Column(String(255), unique=True, nullable=True, index=True)
+    role       = Column(String(64), default="Finance Controller")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # ── 1. upload_sessions ──────────────────────────────────────────────────────
 
 class UploadSession(Base):
     __tablename__ = "upload_sessions"
 
     id               = Column(Integer, primary_key=True, autoincrement=True)
+    user_id          = Column(Integer, nullable=True, index=True)
     filename         = Column(String(255), nullable=False)
     source           = Column(
         SAEnum("order_ledger", "razorpay_psp", "bank_statement", name="source_enum"),
@@ -89,6 +104,8 @@ class ReconciliationRun(Base):
     __tablename__ = "reconciliation_runs"
 
     id                  = Column(Integer, primary_key=True, autoincrement=True)
+    user_id             = Column(Integer, nullable=True, index=True)
+    run_name            = Column(String(255), nullable=True)
     order_session_id    = Column(Integer, ForeignKey("upload_sessions.id", ondelete="SET NULL"), nullable=True)
     psp_session_id      = Column(Integer, ForeignKey("upload_sessions.id", ondelete="SET NULL"), nullable=True)
     bank_session_id     = Column(Integer, ForeignKey("upload_sessions.id", ondelete="SET NULL"), nullable=True)
@@ -160,3 +177,40 @@ class SettlementBreakdown(Base):
 
     # Relationships
     result = relationship("ReconciliationResult", back_populates="breakdown")
+
+
+# ── 6. narrative_reports ─────────────────────────────────────────────────────
+
+class NarrativeReportModel(Base):
+    __tablename__ = "narrative_reports"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    user_id         = Column(Integer, nullable=False, index=True)
+    run_id          = Column(Integer, nullable=True, index=True)
+    markdown        = Column(Text, nullable=False)
+    summary         = Column(Text, nullable=True)
+    management_note = Column(Text, nullable=True)
+    model_used      = Column(String(64), default="gemini-3.6-flash")
+    tokens_used     = Column(Integer, default=0)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+
+# ── 7. exception_tickets ─────────────────────────────────────────────────────
+
+class ExceptionTicket(Base):
+    __tablename__ = "exception_tickets"
+
+    id              = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id         = Column(Integer, nullable=False, index=True)
+    run_id          = Column(Integer, nullable=False, index=True)
+    exception_index = Column(Integer, nullable=False)
+    status          = Column(String(32), default="OPEN")         # OPEN, IN_PROGRESS, RESOLVED
+    assigned_to     = Column(String(255), nullable=True)
+    comments        = Column(Text, nullable=True)                # JSON serialized string
+    resolved_at     = Column(DateTime, nullable=True)
+    resolved_by     = Column(String(255), nullable=True)
+    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_ticket_user_run_idx", "user_id", "run_id", "exception_index"),
+    )

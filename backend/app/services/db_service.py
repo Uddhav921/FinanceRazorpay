@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Upload + Transactions ─────────────────────────────────────────────────────
 
-def save_upload(db: Session, summary: UploadSummary) -> UploadSession:
+def save_upload(db: Session, summary: UploadSummary, user_id: int | None = None) -> UploadSession:
     """
     Persist an upload session and all its normalised transactions.
     Returns the saved UploadSession ORM object (with id populated).
@@ -41,6 +41,7 @@ def save_upload(db: Session, summary: UploadSummary) -> UploadSession:
     qs = summary.quality_report.quality_score if summary.quality_report else Decimal("100.00")
 
     session_orm = UploadSession(
+        user_id          = user_id,
         filename         = summary.filename,
         source           = summary.source.value,
         total_rows       = summary.total_rows,
@@ -60,8 +61,8 @@ def save_upload(db: Session, summary: UploadSummary) -> UploadSession:
     db.refresh(session_orm)
 
     logger.info(
-        "Saved upload session id=%d | source=%s | rows=%d",
-        session_orm.id, summary.source, len(summary.transactions),
+        "Saved upload session id=%d | user_id=%s | source=%s | rows=%d",
+        session_orm.id, str(user_id), summary.source, len(summary.transactions),
     )
     return session_orm
 
@@ -93,6 +94,8 @@ def _txn_to_orm(txn: TransactionBase, session_id: int) -> Transaction:
 def save_reconciliation(
     db:              Session,
     report:          ReconciliationReport,
+    user_id:         int | None = None,
+    run_name:        str | None = None,
     order_session_id: int | None = None,
     psp_session_id:   int | None = None,
     bank_session_id:  int | None = None,
@@ -104,6 +107,8 @@ def save_reconciliation(
     Returns the saved ReconciliationRun ORM object.
     """
     run_orm = ReconciliationRun(
+        user_id             = user_id,
+        run_name            = run_name or f"Reconciliation Run #{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
         order_session_id    = order_session_id,
         psp_session_id      = psp_session_id,
         bank_session_id     = bank_session_id,

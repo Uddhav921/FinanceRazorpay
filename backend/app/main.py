@@ -26,23 +26,43 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
-    logger.info("\U0001f680  AI Finance Controller backend starting up...")
+    logger.info("🚀  FinCtrl backend starting up...")
 
     # Create all DB tables (safe — does nothing if tables already exist)
     try:
         from app.models.database import engine
         from app.models import orm        # ensure ORM classes are registered
         from app.models.orm import (
-            UploadSession, Transaction,
+            User, UploadSession, Transaction,
             ReconciliationRun, ReconciliationResult, SettlementBreakdown,
+            NarrativeReportModel, ExceptionTicket,
         )
-        from sqlalchemy import inspect as sa_inspect
+        from sqlalchemy import inspect as sa_inspect, text
         from app.models.database import Base
         Base.metadata.create_all(bind=engine)
+
+        # Check and add user_id column to upload_sessions and reconciliation_runs if missing
+        with engine.connect() as conn:
+            insp = sa_inspect(engine)
+            upload_cols = [c["name"] for c in insp.get_columns("upload_sessions")]
+            if "user_id" not in upload_cols:
+                logger.info("Migrating upload_sessions: adding user_id column")
+                conn.execute(text("ALTER TABLE upload_sessions ADD COLUMN user_id INT NULL"))
+                conn.commit()
+
+            recon_cols = [c["name"] for c in insp.get_columns("reconciliation_runs")]
+            if "user_id" not in recon_cols:
+                logger.info("Migrating reconciliation_runs: adding user_id column")
+                conn.execute(text("ALTER TABLE reconciliation_runs ADD COLUMN user_id INT NULL"))
+                conn.commit()
+            if "run_name" not in recon_cols:
+                conn.execute(text("ALTER TABLE reconciliation_runs ADD COLUMN run_name VARCHAR(255) NULL"))
+                conn.commit()
+
         tables = sa_inspect(engine).get_table_names()
         logger.info("DB tables ready: %s", tables)
     except Exception as exc:
-        logger.warning("DB init skipped (check XAMPP is running): %s", exc)
+        logger.warning("DB init or migration error: %s", exc)
 
     yield
     logger.info("\U0001f6d1  Backend shutting down.")
@@ -50,7 +70,7 @@ async def lifespan(app: FastAPI):
 
 # ─── App ──────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title       = "AI Finance Controller",
+    title       = "FinCtrl",
     description = (
         "Payment Settlement Reconciliation & Anomaly Detection API. "
         "Supports 3-way reconciliation: Order/Ledger ↔ Razorpay/PSP ↔ Bank Statement."
@@ -71,8 +91,9 @@ app.add_middleware(
 )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
-from app.routes import upload, schema, reconciliation, anomaly, report, exceptions   # noqa: E402
+from app.routes import auth, upload, schema, reconciliation, anomaly, report, exceptions   # noqa: E402
 
+app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(schema.router)
 app.include_router(reconciliation.router)
@@ -84,7 +105,7 @@ app.include_router(exceptions.router)
 # ─── Health Check ─────────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "service": "AI Finance Controller", "version": "0.1.0"}
+    return {"status": "ok", "service": "FinCtrl", "version": "0.1.0"}
 
 
 # ─── Dev Runner ───────────────────────────────────────────────────────────────

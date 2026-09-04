@@ -1,211 +1,46 @@
-import { useState, useEffect, useRef } from 'react'
-import FileUpload from './components/FileUpload'
-import UploadResults from './components/UploadResults'
-import SchemaMap from './components/SchemaMap'
-import Reconciliation from './components/Reconciliation'
-import AIReport from './components/AIReport'
-import ExceptionWorkspace from './components/ExceptionWorkspace'
-import { checkHealth } from './services/api'
+import React from 'react'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import LandingPage from './components/LandingPage'
+import Dashboard from './components/Dashboard'
 
-/* ── Nav icons ────────────────────────────────────────────────────────────── */
-const icons = {
-  upload: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-      <polyline points="17 8 12 3 7 8"/>
-      <line x1="12" y1="3" x2="12" y2="15"/>
-    </svg>
-  ),
-  dashboard: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-      <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-    </svg>
-  ),
-  reconcile: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
-    </svg>
-  ),
-  schema: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="3" width="18" height="4" rx="1"/>
-      <rect x="3" y="10" width="18" height="4" rx="1"/>
-      <rect x="3" y="17" width="18" height="4" rx="1"/>
-    </svg>
-  ),
-  anomaly: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-      <line x1="12" y1="9" x2="12" y2="13"/>
-      <line x1="12" y1="17" x2="12.01" y2="17"/>
-    </svg>
-  ),
-  exceptions: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-  ),
-}
+function AppContent() {
+  const { isAuthenticated, loading } = useAuth()
 
-/* ── Toast ────────────────────────────────────────────────────────────────── */
-function Toast({ toasts }) {
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0d0f1a',
+        color: '#e2e8f0',
+        gap: '1rem',
+      }}>
+        <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
+        <span style={{ fontSize: '0.9rem', color: '#94a3b8', letterSpacing: '0.05em' }}>
+          INITIALIZING SECURE FINOPS ENVIRONMENT...
+        </span>
+      </div>
+    )
+  }
+
   return (
-    <div className="toast-container">
-      {toasts.map(t => (
-        <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>
-      ))}
+    <div className="app-root">
+      {!isAuthenticated ? (
+        <LandingPage />
+      ) : (
+        <Dashboard />
+      )}
     </div>
   )
 }
 
-/* ── App ──────────────────────────────────────────────────────────────────── */
 export default function App() {
-  const [page, setPage] = useState('upload')
-  const [results, setResults] = useState([])
-  const [backendStatus, setBackendStatus] = useState('checking') // 'ok' | 'error' | 'checking'
-  const [toasts, setToasts] = useState([])
-
-  const toastCounter = useRef(0)
-  const addToast = (msg, type = 'success') => {
-    const id = ++toastCounter.current
-    setToasts(p => [...p, { id, msg, type }])
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000)
-  }
-
-  /* health check on mount */
-  useEffect(() => {
-    checkHealth()
-      .then(() => { setBackendStatus('ok'); addToast('Backend connected ✓') })
-      .catch(() => { setBackendStatus('error'); addToast('Cannot reach backend at :8000', 'error') })
-  }, [])
-
-  const handleResult = (res) => {
-    setResults(res)
-    const ok = res.filter(r => !r.error).length
-    const fail = res.filter(r => r.error).length
-    if (ok)   addToast(`${ok} file(s) parsed successfully`)
-    if (fail) addToast(`${fail} file(s) failed to parse`, 'error')
-  }
-
-  const [selectedExceptionId, setSelectedExceptionId] = useState(null)
-
-  const handleNavigate = (targetPage, excId = null) => {
-    setPage(targetPage)
-    if (excId !== null) {
-      setSelectedExceptionId(excId)
-    }
-  }
-
-  const NAV = [
-    { key: 'upload',    label: 'Data Sources',    icon: icons.upload },
-    { key: 'schema',    label: 'Schema Map',       icon: icons.schema },
-    { key: 'dashboard', label: 'Dashboard',        icon: icons.dashboard },
-    { key: 'reconcile', label: 'Reconciliation',   icon: icons.reconcile },
-    { key: 'exceptions',label: 'Exceptions',       icon: icons.exceptions },
-    { key: 'anomalies', label: 'AI Insights',      icon: icons.anomaly },
-  ]
-
   return (
-    <div className="app-layout">
-      {/* ── Sidebar ── */}
-      <aside className="sidebar">
-        <div className="sidebar-logo">AI Finance<span>Controller</span></div>
-        {NAV.map(n => (
-          <button
-            key={n.key}
-            className={`nav-item ${page === n.key ? 'active' : ''}`}
-            onClick={() => setPage(n.key)}
-          >
-            {n.icon}
-            {n.label}
-          </button>
-        ))}
-
-        {/* Backend status indicator */}
-        <div style={{ marginTop: 'auto', padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: backendStatus === 'ok' ? 'var(--clr-success)' : backendStatus === 'error' ? 'var(--clr-danger)' : 'var(--clr-warning)',
-            flexShrink: 0,
-            boxShadow: backendStatus === 'ok' ? '0 0 6px var(--clr-success)' : 'none',
-          }} />
-          <span style={{ fontSize: '0.75rem', color: 'var(--clr-muted)' }}>
-            {backendStatus === 'ok' ? 'API connected' : backendStatus === 'error' ? 'API offline' : 'Connecting…'}
-          </span>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <div className="main-area">
-        <header className="topbar">
-          <div>
-            <h2 style={{ color: 'var(--clr-text)', marginBottom: '0.1rem' }}>
-              {NAV.find(n => n.key === page)?.label}
-            </h2>
-            <p style={{ fontSize: '0.8rem', margin: 0 }}>
-              {page === 'upload' && 'Upload CSV/XLSX files from your three data sources'}
-              {page === 'dashboard' && 'Coming soon — Module 2'}
-              {page === 'reconcile' && '3-Way Transaction Reconciliation Engine'}
-              {page === 'exceptions' && 'Exception Management & FinOps Resolution Workspace'}
-              {page === 'anomalies' && 'AI Narrative Report & Anomaly Insights'}
-            </p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--clr-muted)', background: 'var(--clr-surface-2)', padding: '0.3rem 0.75rem', borderRadius: '999px', border: '1px solid var(--clr-border)' }}>
-              MVP v0.1
-            </span>
-          </div>
-        </header>
-
-        <main className="page-content">
-          {/* ── Upload / Data Sources page ── */}
-          {page === 'upload' && (
-            <>
-              <div className="card" style={{ marginBottom: 0 }}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <h2 style={{ marginBottom: '0.35rem' }}>Upload Data Sources</h2>
-                  <p>Select files for one or more sources. Accepted formats: <strong>CSV, XLSX, XLS</strong></p>
-                </div>
-                <FileUpload onResult={handleResult} />
-              </div>
-              <UploadResults results={results} />
-            </>
-          )}
-
-          {/* ── Reconciliation page ── */}
-          {page === 'reconcile' && <Reconciliation onNavigate={handleNavigate} />}
-
-          {/* ── Exception Workspace page ── */}
-          {page === 'exceptions' && (
-            <ExceptionWorkspace
-              onNavigate={handleNavigate}
-              initialSelectedId={selectedExceptionId}
-            />
-          )}
-
-          {/* ── AI Insights page (Steps 7 & 8) ── */}
-          {page === 'anomalies' && <AIReport onNavigate={handleNavigate} />}
-
-          {/* ── Schema Map page ── */}
-          {page === 'schema' && <SchemaMap />}
-
-          {/* ── Placeholder pages ── */}
-          {page !== 'upload' && page !== 'schema' && page !== 'reconcile' && page !== 'anomalies' && page !== 'exceptions' && (
-            <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚧</div>
-              <h2 style={{ marginBottom: '0.5rem' }}>Coming Soon</h2>
-              <p>This module will be implemented in the next step.</p>
-              <button className="btn btn-ghost" style={{ marginTop: '1.5rem' }} onClick={() => setPage('upload')}>
-                ← Back to Data Sources
-              </button>
-            </div>
-          )}
-        </main>
-      </div>
-
-      <Toast toasts={toasts} />
-    </div>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }

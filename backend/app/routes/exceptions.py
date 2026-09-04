@@ -19,35 +19,89 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.services.recon_state import get_latest_report
+from app.models.database import get_db
+from app.models.orm import ExceptionTicket, User
+from app.services.auth import get_current_user
+from app.services.recon_state import get_latest_report, get_latest_run_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/exceptions", tags=["Exception Workspace"])
-
-# ─── In-memory exception state ────────────────────────────────────────────────
-# Key: exception index (int), Value: dict with workspace metadata
 
 @router.get("/index", include_in_schema=False)
 def _noop(): pass   # forces prefix to register
 
 
-_workspace: Dict[int, dict] = {}   # exception_index → workspace state
-
-
-def _ensure_workspace(idx: int, report):
-    """Initialize workspace entry for an exception if not already tracked."""
-    if idx not in _workspace:
-        _workspace[idx] = {
-            "status"      : "OPEN",
-            "assigned_to" : None,
-            "comments"    : [],
-            "resolved_at" : None,
-            "resolved_by" : None,
+def _get_ticket_state(db: Session, user_id: int, run_id: int, idx: int) -> dict:
+    ticket = (
+        db.query(ExceptionTicket)
+        .filter(
+            ExceptionTicket.user_id == user_id,
+            ExceptionTicket.run_id == run_id,
+            ExceptionTicket.exception_index == idx,
+        )
+        .first()
+    )
+    if ticket:
+        comments = []
+        if ticket.comments:
+            try:
+                import json
+                comments = json.loads(ticket.comments)
+            except Exception:
+                comments = []
+        return {
+            "status": ticket.status or "OPEN",
+            "assigned_to": ticket.assigned_to,
+            "comments": comments,
+            "resolved_at": ticket.resolved_at.isoformat() + "Z" if ticket.resolved_at else None,
+            "resolved_by": ticket.resolved_by,
         }
+    return {
+        "status": "OPEN",
+        "assigned_to": None,
+        "comments": [],
+        "resolved_at": None,
+        "resolved_by": None,
+    }
+
+
+def _save_ticket_state(db: Session, user_id: int, run_id: int, idx: int, state: dict):
+    import json
+    ticket = (
+        db.query(ExceptionTicket)
+        .filter(
+            ExceptionTicket.user_id == user_id,
+            ExceptionTicket.run_id == run_id,
+            ExceptionTicket.exception_index == idx,
+        )
+        .first()
+    )
+    if not ticket:
+        ticket = ExceptionTicket(
+            user_id=user_id,
+            run_id=run_id,
+            exception_index=idx,
+        )
+        db.add(ticket)
+
+    ticket.status = state.get("status", "OPEN")
+    ticket.assigned_to = state.get("assigned_to")
+    ticket.comments = json.dumps(state.get("comments", []))
+    resolved_at_str = state.get("resolved_at")
+    if resolved_at_str:
+        try:
+            ticket.resolved_at = datetime.fromisoformat(resolved_at_str.replace("Z", ""))
+        except Exception:
+            ticket.resolved_at = datetime.utcnow()
+    else:
+        ticket.resolved_at = None
+    ticket.resolved_by = state.get("resolved_by")
+    db.commit()
 
 
 def _exception_to_dict(idx: int, r, ws: dict) -> dict:
@@ -85,14 +139,19 @@ def _exception_to_dict(idx: int, r, ws: dict) -> dict:
 # ─── List exceptions ──────────────────────────────────────────────────────────
 
 @router.get("/", summary="List all exceptions from latest reconciliation run")
-def list_exceptions(status_filter: Optional[str] = None) -> list:
-    report = get_latest_report()
+def list_exceptions(
+    status_filter: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list:
+    report = get_latest_report(user_id=current_user.id)
     if report is None:
         raise HTTPException(status_code=404, detail="No reconciliation run yet.")
+
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
     results = []
     for idx, r in enumerate(report.exceptions):
-        _ensure_workspace(idx, report)
-        ws = _workspace[idx]
+        ws = _get_ticket_state(db, current_user.id, run_id, idx)
         if status_filter and ws["status"] != status_filter.upper():
             continue
         results.append(_exception_to_dict(idx, r, ws))
@@ -102,14 +161,20 @@ def list_exceptions(status_filter: Optional[str] = None) -> list:
 # ─── Get single exception ─────────────────────────────────────────────────────
 
 @router.get("/{exc_id}", summary="Get single exception detail")
-def get_exception(exc_id: int) -> dict:
-    report = get_latest_report()
+def get_exception(
+    exc_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    report = get_latest_report(user_id=current_user.id)
     if report is None:
         raise HTTPException(status_code=404, detail="No reconciliation run yet.")
     if exc_id < 0 or exc_id >= len(report.exceptions):
         raise HTTPException(status_code=404, detail=f"Exception #{exc_id} not found.")
-    _ensure_workspace(exc_id, report)
-    return _exception_to_dict(exc_id, report.exceptions[exc_id], _workspace[exc_id])
+
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
+    ws = _get_ticket_state(db, current_user.id, run_id, exc_id)
+    return _exception_to_dict(exc_id, report.exceptions[exc_id], ws)
 
 
 # ─── Assign ───────────────────────────────────────────────────────────────────
@@ -118,14 +183,22 @@ class AssignRequest(BaseModel):
     assigned_to: str
 
 @router.post("/{exc_id}/assign", summary="Assign exception to a stakeholder")
-def assign_exception(exc_id: int, body: AssignRequest) -> dict:
-    report = get_latest_report()
+def assign_exception(
+    exc_id: int,
+    body: AssignRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    report = get_latest_report(user_id=current_user.id)
     if report is None or exc_id >= len(report.exceptions):
         raise HTTPException(status_code=404, detail="Exception not found.")
-    _ensure_workspace(exc_id, report)
-    _workspace[exc_id]["assigned_to"] = body.assigned_to
-    if _workspace[exc_id]["status"] == "OPEN":
-        _workspace[exc_id]["status"] = "IN_REVIEW"
+
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
+    ws = _get_ticket_state(db, current_user.id, run_id, exc_id)
+    ws["assigned_to"] = body.assigned_to
+    if ws["status"] == "OPEN":
+        ws["status"] = "IN_REVIEW"
+    _save_ticket_state(db, current_user.id, run_id, exc_id, ws)
     return {"ok": True, "assigned_to": body.assigned_to}
 
 
@@ -136,17 +209,25 @@ class CommentRequest(BaseModel):
     text   : str
 
 @router.post("/{exc_id}/comment", summary="Add a comment to an exception")
-def add_comment(exc_id: int, body: CommentRequest) -> dict:
-    report = get_latest_report()
+def add_comment(
+    exc_id: int,
+    body: CommentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    report = get_latest_report(user_id=current_user.id)
     if report is None or exc_id >= len(report.exceptions):
         raise HTTPException(status_code=404, detail="Exception not found.")
-    _ensure_workspace(exc_id, report)
+
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
+    ws = _get_ticket_state(db, current_user.id, run_id, exc_id)
     comment = {
         "author"     : body.author,
         "text"       : body.text,
         "created_at" : datetime.utcnow().isoformat() + "Z",
     }
-    _workspace[exc_id]["comments"].append(comment)
+    ws["comments"].append(comment)
+    _save_ticket_state(db, current_user.id, run_id, exc_id, ws)
     return {"ok": True, "comment": comment}
 
 
@@ -157,32 +238,47 @@ class ResolveRequest(BaseModel):
     note       : Optional[str] = None
 
 @router.post("/{exc_id}/resolve", summary="Mark exception as RESOLVED")
-def resolve_exception(exc_id: int, body: ResolveRequest) -> dict:
-    report = get_latest_report()
+def resolve_exception(
+    exc_id: int,
+    body: ResolveRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    report = get_latest_report(user_id=current_user.id)
     if report is None or exc_id >= len(report.exceptions):
         raise HTTPException(status_code=404, detail="Exception not found.")
-    _ensure_workspace(exc_id, report)
-    _workspace[exc_id]["status"]      = "RESOLVED"
-    _workspace[exc_id]["resolved_at"] = datetime.utcnow().isoformat() + "Z"
-    _workspace[exc_id]["resolved_by"] = body.resolved_by
+
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
+    ws = _get_ticket_state(db, current_user.id, run_id, exc_id)
+    ws["status"]      = "RESOLVED"
+    ws["resolved_at"] = datetime.utcnow().isoformat() + "Z"
+    ws["resolved_by"] = body.resolved_by
     if body.note:
-        _workspace[exc_id]["comments"].append({
+        ws["comments"].append({
             "author"     : body.resolved_by,
             "text"       : f"[RESOLVED] {body.note}",
             "created_at" : datetime.utcnow().isoformat() + "Z",
         })
+    _save_ticket_state(db, current_user.id, run_id, exc_id, ws)
     return {"ok": True, "status": "RESOLVED"}
 
 
 @router.post("/{exc_id}/reopen", summary="Reopen a resolved exception")
-def reopen_exception(exc_id: int) -> dict:
-    report = get_latest_report()
+def reopen_exception(
+    exc_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    report = get_latest_report(user_id=current_user.id)
     if report is None or exc_id >= len(report.exceptions):
         raise HTTPException(status_code=404, detail="Exception not found.")
-    _ensure_workspace(exc_id, report)
-    _workspace[exc_id]["status"]      = "OPEN"
-    _workspace[exc_id]["resolved_at"] = None
-    _workspace[exc_id]["resolved_by"] = None
+
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
+    ws = _get_ticket_state(db, current_user.id, run_id, exc_id)
+    ws["status"]      = "OPEN"
+    ws["resolved_at"] = None
+    ws["resolved_by"] = None
+    _save_ticket_state(db, current_user.id, run_id, exc_id, ws)
     return {"ok": True, "status": "OPEN"}
 
 
