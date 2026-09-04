@@ -17,7 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from app.routes.reconciliation import _latest_report
+from app.services.recon_state import get_latest_report as get_latest_recon_report
 from app.services.anomaly import run_anomaly_detection
 from app.services.llm import NarrativeReport, generate_narrative
 
@@ -39,20 +39,21 @@ _latest_narrative: Optional[NarrativeReport] = None
 def generate_report() -> dict:
     global _latest_narrative
 
-    if _latest_report is None:
+    report = get_latest_recon_report()
+    if report is None:
         raise HTTPException(
-            status_code=404,
-            detail="No reconciliation run found. POST to /reconciliation/run first.",
+            status_code=400,
+            detail="No reconciliation run found. Please upload files and run 3-way reconciliation first.",
         )
 
     # Step 7: anomaly detection
     logger.info("Running anomaly detection for narrative report...")
-    anomaly_report = run_anomaly_detection(_latest_report)
+    anomaly_report = run_anomaly_detection(report)
 
     # Step 8: Gemini LLM narrative
     logger.info("Calling Gemini API for narrative generation...")
     try:
-        narrative = generate_narrative(_latest_report, anomaly_report)
+        narrative = generate_narrative(report, anomaly_report)
     except Exception as exc:
         logger.error("Gemini API error: %s", exc)
         raise HTTPException(status_code=502, detail=f"Gemini API error: {exc}")
@@ -79,13 +80,15 @@ def generate_report() -> dict:
     "/latest",
     summary="Get latest generated narrative report",
 )
-def get_latest_report() -> dict:
+def get_latest_narrative() -> dict:
     if _latest_narrative is None:
-        raise HTTPException(status_code=404, detail="No report generated yet. POST to /report/generate first.")
+        return {"has_report": False, "markdown": None}
     return {
+        "has_report"      : True,
         "markdown"        : _latest_narrative.markdown,
         "summary"         : _latest_narrative.summary,
         "management_note" : _latest_narrative.management_note,
         "model_used"      : _latest_narrative.model_used,
         "tokens_used"     : _latest_narrative.tokens_used,
     }
+

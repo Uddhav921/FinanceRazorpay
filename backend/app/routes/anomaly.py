@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas.transaction import ReconciliationReport
 from app.services.anomaly import AnomalyReport, run_anomaly_detection
-from app.routes.reconciliation import _latest_report
+from app.services.recon_state import get_latest_report
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/anomaly", tags=["Anomaly Detection"])
@@ -22,9 +22,10 @@ router = APIRouter(prefix="/anomaly", tags=["Anomaly Detection"])
     summary="Run anomaly detection on latest reconciliation",
 )
 def anomaly_on_latest() -> dict:
-    if _latest_report is None:
+    latest = get_latest_report()
+    if latest is None:
         raise HTTPException(status_code=404, detail="No reconciliation run yet.")
-    report = run_anomaly_detection(_latest_report)
+    report = run_anomaly_detection(latest)
     return _anomaly_to_dict(report)
 
 

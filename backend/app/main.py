@@ -71,13 +71,14 @@ app.add_middleware(
 )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
-from app.routes import upload, schema, reconciliation, anomaly, report   # noqa: E402
+from app.routes import upload, schema, reconciliation, anomaly, report, exceptions   # noqa: E402
 
 app.include_router(upload.router)
 app.include_router(schema.router)
 app.include_router(reconciliation.router)
 app.include_router(anomaly.router)
 app.include_router(report.router)
+app.include_router(exceptions.router)
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────────

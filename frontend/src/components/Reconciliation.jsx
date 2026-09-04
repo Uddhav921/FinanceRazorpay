@@ -93,7 +93,7 @@ function UnmatchedPanel({ label, icon, color, txns }) {
 }
 
 /* ── Main component ───────────────────────────────────────────────────────── */
-export default function Reconciliation() {
+export default function Reconciliation({ onNavigate }) {
   const [files, setFiles] = useState({ order: null, psp: null, bank: null })
   const [dragging, setDragging] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -248,11 +248,17 @@ export default function Reconciliation() {
               sub={`tol ±${report.tolerance_pct}%`}
               color={report.reconciliation_rate >= 80 ? 'var(--clr-success)' : report.reconciliation_rate >= 50 ? 'var(--clr-warning)' : 'var(--clr-danger)'}
             />
-            <StatCard
-              label="Exceptions"
-              value={report.total_exceptions}
-              color={report.total_exceptions === 0 ? 'var(--clr-success)' : 'var(--clr-danger)'}
-            />
+            <div
+              style={{ cursor: onNavigate && report.total_exceptions > 0 ? 'pointer' : 'default' }}
+              onClick={() => onNavigate && report.total_exceptions > 0 && onNavigate('exceptions')}
+              title={report.total_exceptions > 0 ? 'Click to view exceptions in workspace' : ''}
+            >
+              <StatCard
+                label={report.total_exceptions > 0 ? 'Exceptions ↗' : 'Exceptions'}
+                value={report.total_exceptions}
+                color={report.total_exceptions === 0 ? 'var(--clr-success)' : 'var(--clr-danger)'}
+              />
+            </div>
           </div>
 
           {/* ── Secondary amounts row ── */}
@@ -273,7 +279,7 @@ export default function Reconciliation() {
 
           {/* ── Exceptions panel ── */}
           {report.exceptions?.length > 0 && (
-            <ExceptionsPanel exceptions={report.exceptions} />
+            <ExceptionsPanel exceptions={report.exceptions} onNavigate={onNavigate} />
           )}
 
           {/* ── Unmatched panels ── */}
@@ -364,67 +370,170 @@ function ReconResultsTable({ results }) {
   )
 }
 
+/* ── Settlement breakdown card ────────────────────────────────────── */
+function SettlementCardBlock({ s }) {
+  if (!s) return null
+  const rows = [
+    { label: 'Gross Amount', val: s.gross_amount, neg: false },
+    { label: '− Platform Fee', val: s.fee_amount, neg: true },
+    { label: '− GST (18% on fee)', val: s.tax_amount, neg: true },
+    { label: '− TDS (2%)', val: s.tds_amount, neg: true },
+    { label: '− Refunds', val: s.refund_amount, neg: true },
+    { label: '− Adjustments', val: s.other_adjustments, neg: true },
+  ]
+  const diffVal = Number(s.difference ?? 0)
+  return (
+    <div style={{ background: 'var(--clr-surface)', borderRadius: 8, padding: '1rem', fontSize: '0.82rem', border: '1px solid var(--clr-border)' }}>
+      <div style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--clr-text)' }}>Settlement Breakdown</div>
+      {rows.map(r => r.val > 0 && (
+        <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0', borderBottom: '1px solid var(--clr-border)' }}>
+          <span style={{ color: 'var(--clr-muted)' }}>{r.label}</span>
+          <span style={{ color: r.neg ? 'var(--clr-danger)' : 'var(--clr-text)', fontWeight: 500 }}>
+            {r.neg ? '−' : ''}₹{Number(r.val).toFixed(2)}
+          </span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', marginTop: '0.25rem', fontWeight: 700 }}>
+        <span>Expected Net</span>
+        <span style={{ color: 'var(--clr-success)' }}>₹{Number(s.expected_net ?? 0).toFixed(2)}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}>
+        <span style={{ color: 'var(--clr-muted)' }}>Actual Bank Credit</span>
+        <span style={{ color: '#60a5fa', fontWeight: 600 }}>₹{Number(s.actual_bank_credit ?? 0).toFixed(2)}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderTop: '2px solid var(--clr-border)', marginTop: '0.25rem', fontWeight: 700 }}>
+        <span>Difference (Bank − Expected)</span>
+        <span style={{ fontWeight: 700, color: diffVal >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)', fontFamily: 'monospace' }}>
+          {diffVal >= 0 ? '+' : ''}₹{Math.abs(diffVal).toFixed(2)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 /* ── Settlement breakdown expanded row ──────────────────────────── */
 function SettlementBreakdownRow({ r }) {
   const s = r.settlement || {}
   return (
-    <div className="settlement-breakdown">
-      <div className="settlement-formula">
-        <span className="sf-item gross">Gross<br/><strong>₹{Number(s.gross_amount ?? 0).toFixed(2)}</strong></span>
-        <span className="sf-op">−</span>
-        <span className="sf-item">Fee<br/><strong>₹{Number(s.fee_amount ?? 0).toFixed(2)}</strong></span>
-        <span className="sf-op">−</span>
-        <span className="sf-item">Tax/GST<br/><strong>₹{Number(s.tax_amount ?? 0).toFixed(2)}</strong></span>
-        <span className="sf-op">−</span>
-        <span className="sf-item">TDS<br/><strong>₹{Number(s.tds_amount ?? 0).toFixed(2)}</strong></span>
-        <span className="sf-op">−</span>
-        <span className="sf-item">Refund<br/><strong>₹{Number(s.refund_amount ?? 0).toFixed(2)}</strong></span>
-        {Number(s.other_adjustments ?? 0) > 0 && <>
-          <span className="sf-op">−</span>
-          <span className="sf-item">Adjustments<br/><strong>₹{Number(s.other_adjustments).toFixed(2)}</strong></span>
-        </>}
-        <span className="sf-op">=</span>
-        <span className="sf-item expected">Expected Net<br/><strong>₹{Number(s.expected_net ?? 0).toFixed(2)}</strong></span>
-        <span className="sf-op">vs</span>
-        <span className="sf-item bank">Bank Credit<br/><strong>₹{Number(s.actual_bank_credit ?? 0).toFixed(2)}</strong></span>
-      </div>
+    <div style={{ padding: '0.75rem 1rem', background: 'var(--clr-surface-2)' }}>
+      <SettlementCardBlock s={s} />
       {r.reason_detail && (
-        <div className="settlement-reason">
-          <span style={{ color: 'var(--clr-warning)', marginRight: '0.4rem' }}>⚠</span>
-          {r.reason_detail}
+        <div style={{
+          marginTop: '0.75rem',
+          padding: '0.75rem 1rem',
+          background: '#1e1b2e',
+          borderLeft: '3px solid var(--clr-warning)',
+          borderRadius: '0 6px 6px 0',
+          fontSize: '0.82rem',
+          color: '#e2e8f0',
+        }}>
+          <strong>Why Flagged:</strong> {r.reason_detail}
         </div>
       )}
     </div>
   )
 }
 
-/* ── Exceptions panel ─────────────────────────────────────────────── */
-function ExceptionsPanel({ exceptions }) {
+/* ── Exceptions panel (Matches Screenshot Layout) ───────────────── */
+function ExceptionsPanel({ exceptions, onNavigate }) {
   return (
     <div className="card exception-card" style={{ marginBottom: '1.25rem' }}>
-      <h3 style={{ marginBottom: '1rem', color: 'var(--clr-danger)' }}>
-        ⚠ Exceptions
-        <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--clr-muted)', marginLeft: '0.5rem' }}>
-          ({exceptions.length} rows need attention)
-        </span>
-      </h3>
-      {exceptions.map((r, i) => (
-        <div key={i} className="exception-row">
-          <div className="exception-header">
-            <span className="reason-chip danger">{r.reason_code}</span>
-            <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--clr-muted)' }}>
-              {r.psp_txn?.transaction_id || r.bank_txn?.transaction_id || `Row ${i + 1}`}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div>
+          <h3 style={{ margin: 0, color: 'var(--clr-danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>⚠ Exceptions Flagged</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f87171', background: 'rgba(239, 68, 68, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}>
+              {exceptions.length} rows need attention
             </span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--clr-danger)' }}>
-              Diff: ₹{Number(r.settlement?.difference ?? 0).toFixed(2)}
-            </span>
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--clr-muted)', margin: '0.4rem 0 0' }}>
-            {r.reason_detail}
+          </h3>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--clr-muted)' }}>
+            Financial discrepancies detected during 3-way reconciliation
           </p>
-          <SettlementBreakdownRow r={r} />
         </div>
-      ))}
+        {onNavigate && (
+          <button
+            className="btn btn-primary"
+            style={{ fontSize: '0.82rem', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            onClick={() => onNavigate('exceptions', 0)}
+          >
+            Open Exception Workspace →
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {exceptions.map((r, i) => {
+          const txn = r.psp_txn || r.bank_txn || r.order_txn
+          const txnId = txn?.transaction_id || `Row ${i + 1}`
+          const s = r.settlement || {}
+          const diffVal = Number(s.difference ?? 0)
+
+          return (
+            <div
+              key={i}
+              style={{
+                background: 'var(--clr-surface-2)',
+                border: '1px solid var(--clr-border)',
+                borderRadius: '8px',
+                padding: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+              }}
+            >
+              {/* Header row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--clr-muted)' }}>#{i}</span>
+                  <span className="reason-chip danger" style={{ fontWeight: 600 }}>
+                    {r.reason_code ? r.reason_code.replace(/_/g, ' ') : 'EXCEPTION'}
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--clr-text)', background: 'var(--clr-surface)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid var(--clr-border)' }}>
+                    {txnId}
+                  </span>
+                  {txn?.date && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--clr-muted)' }}>
+                      📅 {String(txn.date)}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
+                  <span style={{ fontWeight: 700, color: diffVal >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                    Diff: {diffVal >= 0 ? '+' : ''}₹{Math.abs(diffVal).toFixed(2)}
+                  </span>
+                  {onNavigate && (
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', border: '1px solid var(--clr-border)' }}
+                      onClick={() => onNavigate('exceptions', i)}
+                    >
+                      Investigate in Workspace →
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Why Flagged (Matches yellow-bordered box in screenshot) */}
+              {r.reason_detail && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  background: '#1e1b2e',
+                  borderLeft: '3px solid var(--clr-warning)',
+                  borderRadius: '0 6px 6px 0',
+                  fontSize: '0.82rem',
+                  color: '#e2e8f0',
+                }}>
+                  <strong style={{ color: 'var(--clr-warning)' }}>Why Flagged:</strong> {r.reason_detail}
+                </div>
+              )}
+
+              {/* Settlement Breakdown (Matches table card in screenshot) */}
+              <SettlementCardBlock s={s} />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

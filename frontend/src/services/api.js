@@ -89,3 +89,30 @@ export async function runReconciliation(orderFile, pspFile, bankFile, tolerance 
 // ─── AI Narrative Report (Steps 7 & 8) ────────────────────────────────────────
 export const generateAIReport = () => request('POST', '/report/generate')
 export const getLatestAIReport = () => request('GET', '/report/latest')
+
+// ─── Exception Workspace (Module 9) ───────────────────────────────────────────
+export const listExceptions = (statusFilter) => {
+  const qs = statusFilter ? `?status_filter=${statusFilter}` : ''
+  return request('GET', `/exceptions/${qs}`)
+}
+export const getException   = (id) => request('GET', `/exceptions/${id}`)
+export const assignException = (id, assigned_to) =>
+  request('POST', `/exceptions/${id}/assign`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assigned_to }),
+  })
+export const addComment = (id, author, text) =>
+  fetch(`/api/exceptions/${id}/comment`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ author, text }),
+  }).then(r => r.json())
+export const resolveException = (id, resolved_by, note = '') =>
+  fetch(`/api/exceptions/${id}/resolve`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolved_by, note }),
+  }).then(r => r.json())
+export const reopenException = (id) => request('POST', `/exceptions/${id}/reopen`)
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+export const downloadExceptionsCsv     = () => window.open('/api/exceptions/export/csv', '_blank')
+export const downloadReconciliationCsv = () => window.open('/api/exceptions/export/reconciliation', '_blank')

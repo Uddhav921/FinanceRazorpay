@@ -4,6 +4,7 @@ import UploadResults from './components/UploadResults'
 import SchemaMap from './components/SchemaMap'
 import Reconciliation from './components/Reconciliation'
 import AIReport from './components/AIReport'
+import ExceptionWorkspace from './components/ExceptionWorkspace'
 import { checkHealth } from './services/api'
 
 /* ── Nav icons ────────────────────────────────────────────────────────────── */
@@ -38,6 +39,12 @@ const icons = {
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
       <line x1="12" y1="9" x2="12" y2="13"/>
       <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
+  exceptions: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M9 11l3 3L22 4"/>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
     </svg>
   ),
 }
@@ -82,11 +89,21 @@ export default function App() {
     if (fail) addToast(`${fail} file(s) failed to parse`, 'error')
   }
 
+  const [selectedExceptionId, setSelectedExceptionId] = useState(null)
+
+  const handleNavigate = (targetPage, excId = null) => {
+    setPage(targetPage)
+    if (excId !== null) {
+      setSelectedExceptionId(excId)
+    }
+  }
+
   const NAV = [
     { key: 'upload',    label: 'Data Sources',    icon: icons.upload },
     { key: 'schema',    label: 'Schema Map',       icon: icons.schema },
     { key: 'dashboard', label: 'Dashboard',        icon: icons.dashboard },
     { key: 'reconcile', label: 'Reconciliation',   icon: icons.reconcile },
+    { key: 'exceptions',label: 'Exceptions',       icon: icons.exceptions },
     { key: 'anomalies', label: 'AI Insights',      icon: icons.anomaly },
   ]
 
@@ -130,8 +147,9 @@ export default function App() {
             <p style={{ fontSize: '0.8rem', margin: 0 }}>
               {page === 'upload' && 'Upload CSV/XLSX files from your three data sources'}
               {page === 'dashboard' && 'Coming soon — Module 2'}
-              {page === 'reconcile' && 'Coming soon — Module 3'}
-              {page === 'anomalies' && 'Coming soon — Module 4'}
+              {page === 'reconcile' && '3-Way Transaction Reconciliation Engine'}
+              {page === 'exceptions' && 'Exception Management & FinOps Resolution Workspace'}
+              {page === 'anomalies' && 'AI Narrative Report & Anomaly Insights'}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -157,16 +175,24 @@ export default function App() {
           )}
 
           {/* ── Reconciliation page ── */}
-          {page === 'reconcile' && <Reconciliation />}
+          {page === 'reconcile' && <Reconciliation onNavigate={handleNavigate} />}
 
-          {/* ── AI Report page (Steps 7 & 8) ── */}
-          {page === 'anomalies' && <AIReport />}
+          {/* ── Exception Workspace page ── */}
+          {page === 'exceptions' && (
+            <ExceptionWorkspace
+              onNavigate={handleNavigate}
+              initialSelectedId={selectedExceptionId}
+            />
+          )}
+
+          {/* ── AI Insights page (Steps 7 & 8) ── */}
+          {page === 'anomalies' && <AIReport onNavigate={handleNavigate} />}
 
           {/* ── Schema Map page ── */}
           {page === 'schema' && <SchemaMap />}
 
           {/* ── Placeholder pages ── */}
-          {page !== 'upload' && page !== 'schema' && page !== 'reconcile' && page !== 'anomalies' && (
+          {page !== 'upload' && page !== 'schema' && page !== 'reconcile' && page !== 'anomalies' && page !== 'exceptions' && (
             <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚧</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Coming Soon</h2>

@@ -38,8 +38,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reconciliation", tags=["Reconciliation"])
 
-# In-memory cache of the last run
-_latest_report: Optional[ReconciliationReport] = None
+from app.services.recon_state import get_latest_report, set_latest_report
+
+# In-memory cache compatibility
+def _get_current_report() -> Optional[ReconciliationReport]:
+    return get_latest_report()
 
 
 def _ingest(file_bytes: bytes, filename: str, source: DataSourceType):
@@ -79,8 +82,6 @@ async def run_reconciliation(
     tds_rate_pct: float      = Form(default=0.0,
                                     description="Override TDS rate % (0 = use PSP data)"),
 ) -> ReconciliationReport:
-    global _latest_report
-
     # ── Read uploaded files ───────────────────────────────────────────────────
     order_bytes = await order_file.read()
     psp_bytes   = await psp_file.read()
@@ -128,7 +129,7 @@ async def run_reconciliation(
         tolerance_pct = tol_decimal,
     )
 
-    _latest_report = report
+    set_latest_report(report)
 
     logger.info(
         "Reconciliation done | reconciled=%d | exceptions=%d | rate=%.1f%%",
@@ -143,12 +144,13 @@ async def run_reconciliation(
     summary="Get latest reconciliation report",
 )
 def get_latest() -> ReconciliationReport:
-    if _latest_report is None:
+    report = get_latest_report()
+    if report is None:
         raise HTTPException(
             status_code=404,
             detail="No reconciliation run yet. POST to /reconciliation/run first.",
         )
-    return _latest_report
+    return report
 
 
 @router.get(
@@ -158,6 +160,7 @@ def get_latest() -> ReconciliationReport:
     description="Returns only EXCEPTION rows from the most recent reconciliation.",
 )
 def get_exceptions() -> list[ReconciliationResult]:
-    if _latest_report is None:
+    report = get_latest_report()
+    if report is None:
         raise HTTPException(status_code=404, detail="No reconciliation run yet.")
-    return _latest_report.exceptions
+    return report.exceptions
