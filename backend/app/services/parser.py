@@ -297,17 +297,19 @@ def build_upload_summary(
     include_transactions: bool = True,
     normalised_count: int = 0,
     quality_report: QualityReport | None = None,
+    normalization_traces: list | None = None,
 ) -> UploadSummary:
     """Wrap a ParseResult (+ optional normalisation & quality data) into the API response schema."""
     total = len(result.transactions) + result.skipped
     return UploadSummary(
-        filename         = filename,
-        source           = source,
-        total_rows       = total,
-        valid_rows       = len(result.transactions),
-        skipped_rows     = result.skipped,
-        normalised_count = normalised_count,
-        parse_errors     = result.errors,
-        quality_report   = quality_report,
-        transactions     = result.transactions if include_transactions else [],
+        filename              = filename,
+        source                = source,
+        total_rows            = total,
+        valid_rows            = len(result.transactions),
+        skipped_rows          = result.skipped,
+        normalised_count      = normalised_count,
+        parse_errors          = result.errors,
+        quality_report        = quality_report,
+        normalization_traces  = normalization_traces or [],
+        transactions          = result.transactions if include_transactions else [],
     )

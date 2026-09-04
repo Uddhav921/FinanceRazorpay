@@ -55,9 +55,10 @@ app.add_middleware(
 )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
-from app.routes import upload                   # noqa: E402  (import after app init)
+from app.routes import upload, schema            # noqa: E402
 
 app.include_router(upload.router)
+app.include_router(schema.router)
 
 # Placeholder routers — will be wired up in subsequent modules
 # app.include_router(reconciliation.router)

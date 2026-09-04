@@ -49,3 +49,11 @@ export async function uploadDataSource(file, source, includeTransactions = true)
   }
   return res.json()
 }
+
+// ─── Schema / Normalization ───────────────────────────────────────────────────
+/**
+ * Fetch the canonical schema map: field definitions, source column aliases,
+ * and normalization pipeline steps.
+ */
+export const getSchemaMapping = () => request('GET', '/schema/mapping')
+

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import FileUpload from './components/FileUpload'
 import UploadResults from './components/UploadResults'
+import SchemaMap from './components/SchemaMap'
 import { checkHealth } from './services/api'
 
 /* ── Nav icons ────────────────────────────────────────────────────────────── */
@@ -21,6 +22,13 @@ const icons = {
   reconcile: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>
+    </svg>
+  ),
+  schema: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="3" width="18" height="4" rx="1"/>
+      <rect x="3" y="10" width="18" height="4" rx="1"/>
+      <rect x="3" y="17" width="18" height="4" rx="1"/>
     </svg>
   ),
   anomaly: (
@@ -73,10 +81,11 @@ export default function App() {
   }
 
   const NAV = [
-    { key: 'upload',      label: 'Data Sources',    icon: icons.upload },
-    { key: 'dashboard',   label: 'Dashboard',       icon: icons.dashboard },
-    { key: 'reconcile',   label: 'Reconciliation',  icon: icons.reconcile },
-    { key: 'anomalies',   label: 'Anomalies',       icon: icons.anomaly },
+    { key: 'upload',    label: 'Data Sources',    icon: icons.upload },
+    { key: 'schema',    label: 'Schema Map',       icon: icons.schema },
+    { key: 'dashboard', label: 'Dashboard',        icon: icons.dashboard },
+    { key: 'reconcile', label: 'Reconciliation',   icon: icons.reconcile },
+    { key: 'anomalies', label: 'Anomalies',         icon: icons.anomaly },
   ]
 
   return (
@@ -145,8 +154,11 @@ export default function App() {
             </>
           )}
 
+          {/* ── Schema Map page ── */}
+          {page === 'schema' && <SchemaMap />}
+
           {/* ── Placeholder pages ── */}
-          {page !== 'upload' && (
+          {page !== 'upload' && page !== 'schema' && (
             <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚧</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Coming Soon</h2>

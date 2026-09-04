@@ -76,16 +76,21 @@ class TransactionBase(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class TransactionCreate(TransactionBase):
-    """Schema used when inserting a new transaction (no DB id yet)."""
-    pass
+# ─── Normalization Trace Schemas ─────────────────────────────────────────────────────
+
+class NormalizationChange(BaseModel):
+    """Documents a single field-level transformation applied during normalisation."""
+    field   : str            # canonical field name
+    before  : Optional[str] # raw value (stringified)
+    after   : Optional[str] # normalised value (stringified)
+    rule    : str            # human-readable rule that was applied
 
 
-class TransactionRead(TransactionBase):
-    """Schema returned by API responses (includes DB id)."""
-    id: int
-
-    model_config = {"from_attributes": True}
+class NormalizationTrace(BaseModel):
+    """Per-row audit trail of all normalisation changes applied."""
+    row_index : int
+    source    : DataSourceType
+    changes   : List[NormalizationChange] = Field(default_factory=list)
 
 
 # ─── Data Quality Schemas ─────────────────────────────────────────────────────
@@ -114,12 +119,13 @@ class QualityReport(BaseModel):
 
 class UploadSummary(BaseModel):
     """Returned after a successful file upload, parse, normalise & quality check."""
-    filename         : str
-    source           : DataSourceType
-    total_rows       : int
-    valid_rows       : int
-    skipped_rows     : int
-    normalised_count : int                   = 0
-    parse_errors     : list[str]             = []
-    quality_report   : Optional[QualityReport] = None
-    transactions     : list[TransactionBase] = []
+    filename              : str
+    source                : DataSourceType
+    total_rows            : int
+    valid_rows            : int
+    skipped_rows          : int
+    normalised_count      : int                      = 0
+    parse_errors          : list[str]                = []
+    quality_report        : Optional[QualityReport]  = None
+    normalization_traces  : List[NormalizationTrace] = Field(default_factory=list)
+    transactions          : list[TransactionBase]    = []

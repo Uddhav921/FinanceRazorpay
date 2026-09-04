@@ -22,7 +22,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.schemas.transaction import DataSourceType, UploadSummary
 from app.services.parser import build_upload_summary, parse_file
-from app.services.normalizer import normalise
+from app.services.normalizer import normalise_with_trace
 from app.services.data_quality import run_quality_checks
 
 logger = logging.getLogger(__name__)
@@ -107,8 +107,8 @@ async def upload_file(
             detail={"message": "Failed to parse any rows.", "errors": result.errors},
         )
 
-    # ── 4. Normalise ──────────────────────────────────────────────────────────
-    normalised = normalise(result.transactions)
+    # ── 4. Normalise + produce audit trace ─────────────────────────────────────────
+    normalised, traces = normalise_with_trace(result.transactions)
     result.transactions = normalised
     normalised_count = len(normalised)
 
@@ -130,4 +130,5 @@ async def upload_file(
         include_transactions=include_transactions,
         normalised_count=normalised_count,
         quality_report=quality_report,
+        normalization_traces=traces,
     )
