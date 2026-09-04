@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import FileUpload from './components/FileUpload'
 import UploadResults from './components/UploadResults'
 import SchemaMap from './components/SchemaMap'
+import Reconciliation from './components/Reconciliation'
 import { checkHealth } from './services/api'
 
 /* ── Nav icons ────────────────────────────────────────────────────────────── */
@@ -154,11 +155,14 @@ export default function App() {
             </>
           )}
 
+          {/* ── Reconciliation page ── */}
+          {page === 'reconcile' && <Reconciliation />}
+
           {/* ── Schema Map page ── */}
           {page === 'schema' && <SchemaMap />}
 
           {/* ── Placeholder pages ── */}
-          {page !== 'upload' && page !== 'schema' && (
+          {page !== 'upload' && page !== 'schema' && page !== 'reconcile' && (
             <div className="card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚧</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Coming Soon</h2>

@@ -57,3 +57,32 @@ export async function uploadDataSource(file, source, includeTransactions = true)
  */
 export const getSchemaMapping = () => request('GET', '/schema/mapping')
 
+// ─── Reconciliation ───────────────────────────────────────────────────────────
+/**
+ * Run 3-way matching by uploading one file per source.
+ * @param {File}   orderFile  - Order/Ledger file
+ * @param {File}   pspFile    - Razorpay/PSP file
+ * @param {File}   bankFile   - Bank Statement file
+ * @param {number} tolerance  - Amount tolerance % (default 0.5)
+ * @param {number} dateWindow - Date window in days (default 2)
+ */
+export async function runReconciliation(orderFile, pspFile, bankFile, tolerance = 0.5, dateWindow = 2) {
+  const form = new FormData()
+  form.append('order_file',  orderFile)
+  form.append('psp_file',    pspFile)
+  form.append('bank_file',   bankFile)
+  form.append('tolerance',   String(tolerance))
+  form.append('date_window', String(dateWindow))
+
+  const res = await fetch(`${BASE}/reconciliation/run`, { method: 'POST', body: form })
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try {
+      const body = await res.json()
+      detail = body?.detail?.message || body?.detail || detail
+    } catch {}
+    throw new Error(detail)
+  }
+  return res.json()
+}
+

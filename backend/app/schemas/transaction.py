@@ -7,7 +7,7 @@ into this common shape before any further processing.
 
 from __future__ import annotations
 
-from datetime import date as Date
+from datetime import date as Date, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import List, Optional
@@ -129,3 +129,35 @@ class UploadSummary(BaseModel):
     quality_report        : Optional[QualityReport]  = None
     normalization_traces  : List[NormalizationTrace] = Field(default_factory=list)
     transactions          : list[TransactionBase]    = []
+
+
+# ─── Matching Engine Schemas ───────────────────────────────────────────────────
+
+class MatchResult(BaseModel):
+    """A single 3-way (or 2-way) candidate match with confidence score."""
+    order_txn      : Optional[TransactionBase] = None
+    psp_txn        : Optional[TransactionBase] = None
+    bank_txn       : Optional[TransactionBase] = None
+    confidence     : int     = Field(..., ge=0, le=100, description="Match confidence 0–100")
+    match_strategy : str     = Field(..., description="Which strategy produced this match")
+    amount_diff    : Decimal = Field(default=Decimal("0.00"), description="|psp_net − bank_net|")
+    date_diff_days : Optional[int] = Field(None, description="Days between PSP and bank dates")
+    is_reconciled  : bool    = Field(False, description="True if amount_diff <= tolerance")
+
+
+class MatchReport(BaseModel):
+    """Full output of the 3-way matching engine for one reconciliation run."""
+    total_order      : int
+    total_psp        : int
+    total_bank       : int
+    matched          : List[MatchResult]         = Field(default_factory=list)
+    unmatched_order  : List[TransactionBase]     = Field(default_factory=list)
+    unmatched_psp    : List[TransactionBase]     = Field(default_factory=list)
+    unmatched_bank   : List[TransactionBase]     = Field(default_factory=list)
+    match_rate       : float  = 0.0   # matched / max(total_order, total_psp, total_bank) * 100
+    reconciled_rate  : float  = 0.0   # reconciled / matched * 100
+    tolerance        : Decimal = Decimal("0.5")  # % tolerance used
+    run_at           : datetime = Field(default_factory=datetime.utcnow)
+
+    model_config = {"arbitrary_types_allowed": True}
+
