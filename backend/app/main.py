@@ -86,15 +86,19 @@ _cors_origins_raw = os.getenv("CORS_ORIGINS", "").strip()
 _allowed_origins = (
     [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
     if _cors_origins_raw
-    else ["*"]
+    else []
 )
 
+# NOTE: allow_origins=["*"] + allow_credentials=True is invalid per CORS spec
+# and browsers reject it. When no specific origins are configured, we use
+# allow_origin_regex to match all origins while properly reflecting the Origin header.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = _allowed_origins,
-    allow_credentials = True,
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
+    allow_origins       = _allowed_origins if _allowed_origins else ["*"],
+    allow_origin_regex  = r".*" if not _allowed_origins else None,
+    allow_credentials   = True,
+    allow_methods       = ["*"],
+    allow_headers       = ["*"],
 )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
