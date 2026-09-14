@@ -2688,3 +2688,66 @@ tbody td { padding: 0.7rem 1rem; color: var(--clr-text); white-space: nowrap; }
   opacity: 0.7;
 }
 
+/* ── Go to Dashboard – Navbar Button ──────────────────────────────────────── */
+.btn-go-dashboard {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  transition: all 0.2s ease;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.btn-go-dashboard:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.7);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(99, 102, 241, 0.3);
+}
+.btn-go-dashboard:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ── Go to Dashboard – Hero Button ────────────────────────────────────────── */
+.btn-hero-dashboard {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2.25rem;
+  border-radius: 14px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
+  color: #fff;
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.45), 0 2px 8px rgba(0,0,0,0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: -0.01em;
+}
+.btn-hero-dashboard:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 16px 40px rgba(99, 102, 241, 0.55), 0 4px 12px rgba(0,0,0,0.35);
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 50%, #6366f1 100%);
+}
+.btn-hero-dashboard:active {
+  transform: translateY(-1px) scale(0.99);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+}
+.btn-hero-dashboard .arrow-icon {
+  font-size: 1.2rem;
+  transition: transform 0.2s ease;
+}
+.btn-hero-dashboard:hover .arrow-icon {
+  transform: translateX(4px);
+}
+

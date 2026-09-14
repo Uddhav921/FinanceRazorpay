@@ -11,7 +11,7 @@ import {
   getLatestReconciliation,
 } from '../services/api'
 
-export default function Dashboard() {
+export default function Dashboard({ goHome }) {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('quality') // 'quality' | 'reconcile' | 'exceptions' | 'ai-insights'
   const [reconSubTab, setReconSubTab] = useState('runner') // 'runner' | 'schema'
@@ -93,8 +93,8 @@ export default function Dashboard() {
         <div className="header-left">
           <button
             className="dash-brand dash-brand-home-btn"
-            onClick={logout}
-            title="Go to Home"
+            onClick={goHome}
+            title="Go to Home Page"
             aria-label="FinCtrl Home"
           >
             <div className="dash-logo">

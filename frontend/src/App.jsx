@@ -1,10 +1,22 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import LandingPage from './components/LandingPage'
 import Dashboard from './components/Dashboard'
 
 function AppContent() {
   const { isAuthenticated, loading } = useAuth()
+  // 'dashboard' | 'home'
+  const [currentView, setCurrentView] = useState('home')
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Auto-redirect to dashboard on login
+      setCurrentView('dashboard')
+    } else {
+      // On logout, go back to home/landing
+      setCurrentView('home')
+    }
+  }, [isAuthenticated])
 
   if (loading) {
     return (
@@ -26,13 +38,28 @@ function AppContent() {
     )
   }
 
+  // Authenticated + dashboard view → show Dashboard
+  if (isAuthenticated && currentView === 'dashboard') {
+    return (
+      <div className="app-root">
+        <Dashboard goHome={() => setCurrentView('home')} />
+      </div>
+    )
+  }
+
+  // Authenticated + home view → landing with "Go to Dashboard" button
+  if (isAuthenticated && currentView === 'home') {
+    return (
+      <div className="app-root">
+        <LandingPage goToDashboard={() => setCurrentView('dashboard')} />
+      </div>
+    )
+  }
+
+  // Not authenticated → normal landing page
   return (
     <div className="app-root">
-      {!isAuthenticated ? (
-        <LandingPage />
-      ) : (
-        <Dashboard />
-      )}
+      <LandingPage />
     </div>
   )
 }
