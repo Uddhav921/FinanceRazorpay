@@ -91,7 +91,12 @@ export default function Dashboard() {
       {/* ─── Global Top Navigation Bar ─── */}
       <header className="dashboard-header no-print">
         <div className="header-left">
-          <div className="dash-brand">
+          <button
+            className="dash-brand dash-brand-home-btn"
+            onClick={logout}
+            title="Go to Home"
+            aria-label="FinCtrl Home"
+          >
             <div className="dash-logo">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -103,7 +108,7 @@ export default function Dashboard() {
               <span className="dash-title">FinCtrl</span>
               <span className="dash-badge">FinOps Enterprise</span>
             </div>
-          </div>
+          </button>
 
           {/* Module Navigation Tabs */}
           <nav className="dash-nav-tabs">
