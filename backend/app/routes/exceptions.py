@@ -285,11 +285,15 @@ def reopen_exception(
 # ─── Export ──────────────────────────────────────────────────────────────────
 
 @router.get("/export/csv", summary="Download exceptions as CSV")
-def export_csv():
-    report = get_latest_report()
+def export_csv(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    report = get_latest_report(user_id=current_user.id)
     if report is None:
         raise HTTPException(status_code=404, detail="No reconciliation run yet.")
 
+    run_id = get_latest_run_id(user_id=current_user.id) or 0
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
@@ -301,8 +305,7 @@ def export_csv():
     ])
 
     for idx, r in enumerate(report.exceptions):
-        _ensure_workspace(idx, report)
-        ws  = _workspace[idx]
+        ws  = _get_ticket_state(db, current_user.id, run_id, idx)
         txn = r.psp_txn or r.bank_txn or r.order_txn
         s   = r.settlement
         writer.writerow([
@@ -333,9 +336,12 @@ def export_csv():
     )
 
 
+
 @router.get("/export/reconciliation", summary="Download full reconciliation as CSV")
-def export_reconciliation_csv():
-    report = get_latest_report()
+def export_reconciliation_csv(
+    current_user: User = Depends(get_current_user),
+):
+    report = get_latest_report(user_id=current_user.id)
     if report is None:
         raise HTTPException(status_code=404, detail="No reconciliation run yet.")
 

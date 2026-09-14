@@ -4,7 +4,7 @@
  * Supports JWT Token injection & User-Scoped Multi-Tenant operations.
  */
 
-const BASE = '/api'
+const BASE = import.meta.env.VITE_API_URL || '/api'
 const TOKEN_KEY = 'finops_auth_token'
 
 export function getAuthToken() {

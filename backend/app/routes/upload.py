@@ -22,7 +22,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from app.models.database import get_db
+from app.models.orm import User
 from app.schemas.transaction import DataSourceType, UploadSummary
+from app.services.auth import get_current_user
 from app.services.parser import build_upload_summary, parse_file
 from app.services.normalizer import normalise_with_trace
 from app.services.data_quality import run_quality_checks
@@ -70,6 +72,7 @@ async def upload_file(
         description="Whether to run Data Quality checks after normalisation",
     ),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> UploadSummary:
     """
     Full ingestion pipeline:
